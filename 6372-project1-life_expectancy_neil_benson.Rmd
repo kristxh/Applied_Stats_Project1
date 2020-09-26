@@ -94,6 +94,7 @@ t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,summary))
 t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,sd))
 ```
 
+
 # histogram of life_expectancy
 ```{r}
 theme_set(theme_igray())
@@ -110,99 +111,6 @@ ggplot()+ le_hist + xlab("Years") + ggtitle("Life Expectancy")
 
 ```
 
-# Overall Life Expectancy
-```{r}
-
-le_by_yr <- ddply(life_ex_cleaned_DF, .(year), summarize,  avg_le=mean(life_expectancy))
-
-le_line <- geom_line(
-  mapping = aes(x = year, y = avg_le),
-  data = le_by_yr,
-  size = 1,
-  colour = "dodgerblue4"
-)
-
-ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: 2000 - 2015") 
-
-```
-
-# Developed/Developing Life Expectancy
-```{r visual1 fig.width=20, fig.height=10}}
-le_by_status <- ddply(life_ex_cleaned_DF, .(year,status), summarize,  avg_le=mean(life_expectancy))
-line_colors <- c("dodgerblue4", "#D55E00")
-
-le_line2 <- geom_line(
-  mapping = aes(x = year, y = avg_le, group=status, color=status),
-  data = le_by_status,
-  size = 1
-)
-
-ggplot() + le_line2 +  xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: Developed and Developing Countries") + scale_colour_manual(values=line_colors)
-
-```
-# histograms of 
-
-# boxplot by status (developing, developed)
-```{r visual1, fig.width=6, fig.height=6}
-# Plot boxplot
-
-dev_box <- geom_boxplot(
-  mapping = aes(x=status, y=life_expectancy),
-  data = life_ex_cleaned_DF,
-  colour = "black",
-  fill = "#56B4E9",
-  groupColors=c('#999999','#E69F00')
-)
-
-ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitle("Life Expectancy: Developed and Developing Countries ")
-
-```
-
-
-# boxplots by status by year
-
-```{r visual1, fig.width=10, fig.height=6}
-# Plot boxplot
-
-yr_box <- stat_boxplot(
-  mapping = aes(x=year, y=life_expectancy, group=year),
-  data = life_ex_cleaned_DF,
-  colour = "black",
-  fill = "#56B4E9"
-  ) 
-  
-
-ggplot()+ yr_box + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy by Year")  
-```
-```{r fig.width=10, fig.height=6}
-# Scatterplot boxplot
-
-le_scatter <- geom_point(
-  mapping = aes(x=year, y=life_expectancy, color=status),
-  data = life_ex_cleaned_DF
-  ) 
-  
-
-ggplot()+ le_scatter + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy: Developed and Developing Countries")  + scale_colour_manual(values=line_colors)
-```
-
-# correlation matrix with pearson correlation coefficients
-```{r}
-theme_set(theme_igray())
-
-le_hist <- geom_histogram(
-  mapping = aes(life_expectancy),
-  data = life_ex_cleaned_DF,
-  bins = 20,
-  colour = "gray",
-  fill = "#0072B2"
-)
-
-ggplot()+ le_hist + xlab("Years") + ggtitle("Life Expectancy")
-
-```
-The response is left skewed and may benefit from a transformation.
-
 
 # Overall Life Expectancy
 ```{r}
@@ -222,7 +130,7 @@ ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average L
 
 
 # Developed/Developing Life Expectancy
-```{r, visual1, fig.width=20, fig.height=10}
+```{r visual1, fig.width=20, fig.height=10}
 le_by_status <- ddply(life_ex_cleaned_DF, .(year,status), summarize,  avg_le=mean(life_expectancy))
 line_colors <- c("dodgerblue4", "#D55E00")
 
@@ -238,7 +146,9 @@ ggplot() + le_line2 +  xlab("Year") + ylab("Life Expectancy") + ggtitle("Average
 
 
 # boxplot by status (developing, developed)
-```{r, visual2, fig.width=6, fig.height=6}
+```{r visual2, fig.width=6, fig.height=6}
+# Plot boxplot
+
 dev_box <- geom_boxplot(
   mapping = aes(x=status, y=life_expectancy),
   data = life_ex_cleaned_DF,
@@ -253,7 +163,7 @@ ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitl
 
 
 # boxplots by status by year
-```{r, visual3, fig.width=10, fig.height=6}
+```{r visual3, fig.width=10, fig.height=6}
 # Plot boxplot
 
 yr_box <- stat_boxplot(
@@ -266,8 +176,6 @@ yr_box <- stat_boxplot(
 
 ggplot()+ yr_box + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy by Year")  
 ```
-
-
 ```{r fig.width=10, fig.height=6}
 # Scatterplot boxplot
 
@@ -353,6 +261,7 @@ full.model <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars])
 
 vif(full.model, data = life_ex_cleaned_DF)
 
+# removing columns and re-evaluating
 colstodelete <- c("under_five_deaths", "thinness_5_9_years", "gdp", "population")
 
 full.model1 <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars] %>% select(-colstodelete))
@@ -371,7 +280,6 @@ multicolinearity between the two. We will remove gdp and re-evaluate.
 
 schooling and income_composition_of_resources have are correlated to each with Pearson Correlation Coefficient of .8, but have VIFs
 of 3.62 and 3.05. While these are highly correlated, their VIFs are relatively low. We will leave them in them in for variable selection.
-
 
 
 # checking the significance of the factorial variables using ANOVA
