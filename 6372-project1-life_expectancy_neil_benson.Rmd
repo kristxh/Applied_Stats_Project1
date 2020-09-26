@@ -137,12 +137,38 @@ ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
 ```
 
+# checking the significance of the factorial variables using ANOVA
+```{r}
+# convert categorical variables to factors
+names <- c("country", "year", "status")
 
-# histogram of life_expectancy
+life_ex_cleaned_factor_DF <- life_ex_cleaned_DF
 
-# histograms of 
+# set the categorical columns to factor
+for (name in names)
+{
+  life_ex_cleaned_factor_DF[,name]<-factor(life_ex_cleaned_DF[,name])
+}
 
-# boxplot by status (developing, developed)
+# convert factors to numeric for factor analysis
+life_ex_cleaned_asnum_DF <- life_ex_cleaned_factor_DF[,names] %>% mutate_all(as.numeric)
 
-# boxplots by status by year
+# adding suffix ASNUM to numerical representation of factors columns
+colnames(life_ex_cleaned_asnum_DF) <- paste(colnames(life_ex_cleaned_asnum_DF), "ASNUM", sep = "_")
 
+# adding numerical factor columns to base Df in order to perform stepwise for variable selection
+life_ex_cleaned_withnum_DF <- cbind(life_ex_cleaned_factor_DF, life_ex_cleaned_asnum_DF)
+
+# dropping factor columns
+life_ex_cleaned_withnum_DF <- life_ex_cleaned_withnum_DF[, sapply(life_ex_cleaned_withnum_DF, class) != "factor"]
+
+#  columns for anova factor analysis
+anovacols <- c(colnames(life_ex_cleaned_asnum_DF))
+
+#  creating the formula to pass into aov function
+anovafmla <- as.formula(paste("life_expectancy ~ ", paste(anovacols, collapse= "+")))
+
+# passing my auto generated formula to analyze
+anova_fit <- aov(anovafmla, data=life_ex_cleaned_withnum_DF)
+summary(anova_fit)
+```
