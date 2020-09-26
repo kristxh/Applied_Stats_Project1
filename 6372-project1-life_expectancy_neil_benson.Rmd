@@ -1,10 +1,11 @@
 ---
 title: "6372 Project 1 - Life Expectancy"
-author: "By Kristin Herman, Bo Yun, Eric Romero, Neil Benson"
+
+author: "By Kristi Herman, Bo Yun, Eric Romero, Neil Benson"
 date: "09/20/2020"
 output: word_document 
 ---
- 
+  
 # Introduction
 Introduction paragraphs here
 
@@ -89,6 +90,98 @@ vis_miss(life_ex_cleaned_DF) + xlab("Data Columns")
 summary(life_ex_cleaned_DF)
 ```
 
+# histogram of life_expectancy
+```{r}
+theme_set(theme_igray())
+
+le_hist <- geom_histogram(
+  mapping = aes(life_expectancy),
+  data = life_ex_cleaned_DF,
+  bins = 20,
+  colour = "gray",
+  fill = "#0072B2"
+)
+
+ggplot()+ le_hist + xlab("Years") + ggtitle("Life Expectancy")
+
+```
+
+# Overall Life Expectancy
+```{r}
+
+le_by_yr <- ddply(life_ex_cleaned_DF, .(year), summarize,  avg_le=mean(life_expectancy))
+
+le_line <- geom_line(
+  mapping = aes(x = year, y = avg_le),
+  data = le_by_yr,
+  size = 1,
+  colour = "dodgerblue4"
+)
+
+ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: 2000 - 2015") 
+
+```
+
+# Developed/Developing Life Expectancy
+```{r visual1 fig.width=20, fig.height=10}}
+le_by_status <- ddply(life_ex_cleaned_DF, .(year,status), summarize,  avg_le=mean(life_expectancy))
+line_colors <- c("dodgerblue4", "#D55E00")
+
+le_line2 <- geom_line(
+  mapping = aes(x = year, y = avg_le, group=status, color=status),
+  data = le_by_status,
+  size = 1
+)
+
+ggplot() + le_line2 +  xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: Developed and Developing Countries") + scale_colour_manual(values=line_colors)
+
+```
+# histograms of 
+
+# boxplot by status (developing, developed)
+```{r visual1, fig.width=6, fig.height=6}
+# Plot boxplot
+
+dev_box <- geom_boxplot(
+  mapping = aes(x=status, y=life_expectancy),
+  data = life_ex_cleaned_DF,
+  colour = "black",
+  fill = "#56B4E9",
+  groupColors=c('#999999','#E69F00')
+)
+
+ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitle("Life Expectancy: Developed and Developing Countries ")
+
+```
+
+
+# boxplots by status by year
+
+```{r visual1, fig.width=10, fig.height=6}
+# Plot boxplot
+
+yr_box <- stat_boxplot(
+  mapping = aes(x=year, y=life_expectancy, group=year),
+  data = life_ex_cleaned_DF,
+  colour = "black",
+  fill = "#56B4E9"
+  ) 
+  
+
+ggplot()+ yr_box + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy by Year")  
+```
+```{r fig.width=10, fig.height=6}
+# Scatterplot boxplot
+
+le_scatter <- geom_point(
+  mapping = aes(x=year, y=life_expectancy, color=status),
+  data = life_ex_cleaned_DF
+  ) 
+  
+
+ggplot()+ le_scatter + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy: Developed and Developing Countries")  + scale_colour_manual(values=line_colors)
+```
+
 # correlation matrix with pearson correlation coefficients
 ```{r}
 library(reshape2)
@@ -136,6 +229,7 @@ ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 
 ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
 ```
+
 
 # checking the significance of the factorial variables using ANOVA
 ```{r}
