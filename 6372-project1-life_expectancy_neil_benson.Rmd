@@ -1,13 +1,15 @@
 ---
 title: "6372 Project 1 - Life Expectancy"
-
 author: "By Kristi Herman, Bo Yun, Eric Romero, Neil Benson"
 date: "09/20/2020"
-output: word_document 
+output:
+  html_document:
+    df_print: paged
 ---
   
 # Introduction
 Introduction paragraphs here
+
 
 ## Importing the necessary libraries
 ```{r,warning=FALSE,message=FALSE}
@@ -29,7 +31,7 @@ library(zoo)
   
   
 ## Importing and Cleaning the Data
-```{r,fig.height=6, fig.width=9,echo=FALSE,warning=FALSE,message=FALSE}
+```{r, warning=FALSE, message=FALSE}
 ########### Loading the data
 life_ex_DF <- read.csv("https://raw.githubusercontent.com/kristxh/Applied_Stats_Project1/master/datasets_12603_17232_Life_Expectancy_Data.csv")
 
@@ -39,10 +41,7 @@ colnames(life_ex_DF) <- gsub("\\.\\.",".",colnames(life_ex_DF))
 colnames(life_ex_DF) <- gsub("\\.","_",colnames(life_ex_DF))
 names(life_ex_DF)[19] <- "thinness_10_19_years"
 
-# reviewing the structure of the data
-str(life_ex_DF)
-
-# converting status to factor column
+# converting status and year to factor columns
 life_ex_DF$status <- as.factor(life_ex_DF$status)
 ```
 
@@ -85,10 +84,16 @@ life_ex_cleaned_DF <- as.data.frame(life_ex_median_DF %>%
 vis_miss(life_ex_cleaned_DF) + xlab("Data Columns")
 ```
 
+
 # summary of cleaned up data
 ```{r}
 summary(life_ex_cleaned_DF)
+str(life_ex_cleaned_DF)
+
+t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,summary))
+t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,sd))
 ```
+
 
 # histogram of life_expectancy
 ```{r}
@@ -106,6 +111,7 @@ ggplot()+ le_hist + xlab("Years") + ggtitle("Life Expectancy")
 
 ```
 
+
 # Overall Life Expectancy
 ```{r}
 
@@ -122,8 +128,9 @@ ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average L
 
 ```
 
+
 # Developed/Developing Life Expectancy
-```{r visual1 fig.width=20, fig.height=10}}
+```{r visual1, fig.width=20, fig.height=10}
 le_by_status <- ddply(life_ex_cleaned_DF, .(year,status), summarize,  avg_le=mean(life_expectancy))
 line_colors <- c("dodgerblue4", "#D55E00")
 
@@ -136,10 +143,10 @@ le_line2 <- geom_line(
 ggplot() + le_line2 +  xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: Developed and Developing Countries") + scale_colour_manual(values=line_colors)
 
 ```
-# histograms of 
+
 
 # boxplot by status (developing, developed)
-```{r visual1, fig.width=6, fig.height=6}
+```{r visual2, fig.width=6, fig.height=6}
 # Plot boxplot
 
 dev_box <- geom_boxplot(
@@ -156,8 +163,7 @@ ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitl
 
 
 # boxplots by status by year
-
-```{r visual1, fig.width=10, fig.height=6}
+```{r visual3, fig.width=10, fig.height=6}
 # Plot boxplot
 
 yr_box <- stat_boxplot(
@@ -182,8 +188,9 @@ le_scatter <- geom_point(
 ggplot()+ le_scatter + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy: Developed and Developing Countries")  + scale_colour_manual(values=line_colors)
 ```
 
+
 # correlation matrix with pearson correlation coefficients
-```{r}
+```{r, fig.height=9, fig.width=9}
 library(reshape2)
 
 corr <- round(cor(life_ex_cleaned_DF[,corvars]),1)
@@ -229,6 +236,50 @@ ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 
 ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
 ```
+It appears there is a high degree of correlation between the following:  
+- thinnes_5_9_years and thinnes_5_9_years
+- percentage_expenditure and gdp
+- under_5_deaths and infant_deaths
+- schooling and income_composition_of_resources
+- population has 0 correlation with the response variable and will be removed as a predictor and is incomplete throughout the data set
+
+
+# further examining the issue of multicolinearity
+```{r, fig.height=9, fig.width=9}
+pairs(life_ex_cleaned_DF[,corvars], pch = 19,  cex = 0.5,
+      col = line_colors[life_ex_cleaned_DF$status],
+      upper.panel=NULL)
+
+```
+
+
+# checking colinearity with VIF and removing redundant columns
+```{r}
+library(car)
+
+full.model <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars])
+
+vif(full.model, data = life_ex_cleaned_DF)
+
+# removing columns and re-evaluating
+colstodelete <- c("under_five_deaths", "thinness_5_9_years", "gdp", "population")
+
+full.model1 <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars] %>% select(-colstodelete))
+
+vif(full.model1, data = life_ex_cleaned_DF[,corvars] %>% select(-all_of(colstodelete)))
+
+```
+infant_deaths and under_five_deaths have a VIF of 177.36 and 176.35 respectively, indicating a very high degree of 
+multicolinearity between the two. We will remove under_five_deaths and re-evaluate.
+
+thinness_5_9_years and thinness_10_19_years have a VIF of 8.82 and 8.74 respectively, indicating a very high degree of 
+multicolinearity between the two. We will remove thinness_5_9_years and re-evaluate.
+
+percentage_expenditure and gdp have a VIF of 4.92 and 5.32 respectively, indicating a very high degree of 
+multicolinearity between the two. We will remove gdp and re-evaluate.
+
+schooling and income_composition_of_resources have are correlated to each with Pearson Correlation Coefficient of .8, but have VIFs
+of 3.62 and 3.05. While these are highly correlated, their VIFs are relatively low. We will leave them in them in for variable selection.
 
 
 # checking the significance of the factorial variables using ANOVA
@@ -265,4 +316,318 @@ anovafmla <- as.formula(paste("life_expectancy ~ ", paste(anovacols, collapse= "
 # passing my auto generated formula to analyze
 anova_fit <- aov(anovafmla, data=life_ex_cleaned_withnum_DF)
 summary(anova_fit)
+```
+Both year and status are statistically significant as categorical predictors. 
+We will remove country from the data set for variable selection.
+
+
+# removing columns with high colinearity or low significance
+```{r}
+# adding "country" to the list of columns to delete after its poor performance in ANOVA analysis
+colstodelete <- append(colstodelete, "country")  
+
+Life <- life_ex_cleaned_factor_DF %>% select(-colstodelete) 
+
+# Checking residuals and q-q plot
+par(mfrow=c(2,2))
+plot(full.model)
+```
+
+
+# splitting the data into test and training sets for cross validation
+```{r}
+# Cross Validation on Train vs Test 
+# Splitting 2939 observations of the data into Training and Test set in the ratio of 70:30
+set.seed(1234)
+trainIndices = sample(seq(1:dim(Life)[1]),round(.7*dim(Life)[1]))
+train = Life[trainIndices,]
+test = Life[-trainIndices,]
+dim(train)
+dim(test)
+```
+
+
+# creating a prediction function
+```{r}
+predict.regsubsets = function (object , newdata ,id ,...){
+  form=as.formula (object$call [[2]])
+  mat=model.matrix(form ,newdata )
+  coefi=coef(object ,id=id)
+  xvars=names(coefi)
+  mat[,xvars]%*%coefi
+}
+```
+
+
+# Variable selection - Forward 
+```{r}
+# Just the training set
+library(leaps)
+
+reg.fwd=regsubsets(life_expectancy~.,data=train,method="forward",nvmax=14)
+
+par(mfrow=c(1,3))
+
+bics<-summary(reg.fwd)$bic
+
+plot(1:14,bics,type="l",ylab="BIC",xlab="# of predictors")
+
+index<-which(bics==min(bics))
+
+points(index,bics[index],col="red",pch=10)
+
+adjr2<-summary(reg.fwd)$adjr2
+
+plot(1:14,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+
+index<-which(adjr2==max(adjr2))
+
+points(index,adjr2[index],col="red",pch=10)
+
+rss<-summary(reg.fwd)$rss
+
+plot(1:14,rss,type="l",ylab="train RSS",xlab="# of predictors")
+
+index<-which(rss==min(rss))
+
+points(index,rss[index],col="red",pch=10)
+
+mtext("Variable selection - Forward", side = 3, line = -2, outer = TRUE)
+
+# -> 11 predictors
+```
+
+
+# Variable selection - Backward
+```{r}
+# Just the training set
+reg.bwd=regsubsets(life_expectancy~.,data=train,method="backward",nvmax=14)
+
+par(mfrow=c(1,3))
+
+bics2<-summary(reg.bwd)$bic
+
+plot(1:14,bics2,type="l",ylab="BIC",xlab="# of predictors")
+
+index2<-which(bics2==min(bics2))
+
+points(index2,bics2[index2],col="red",pch=10)
+
+adjr2<-summary(reg.bwd)$adjr2
+
+plot(1:14,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+
+index.r2<-which(adjr2==max(adjr2))
+
+points(index.r2,adjr2[index.r2],col="red",pch=10)
+
+rss2<-summary(reg.bwd)$rss
+
+plot(1:14,rss2,type="l",ylab="train RSS",xlab="# of predictors")
+
+index.rss2<-which(rss2==min(rss2))
+
+points(index.rss2,rss[index.rss2],col="red",pch=10)
+
+mtext("Variable selection - Backward", side = 3, line = -2, outer = TRUE)
+
+# -> 11 predictors
+```
+
+
+# Variable selection - Stepwise
+```{r}
+# Just the training set
+reg.stp=regsubsets(life_expectancy~.,data=train,method="seqrep",nvmax=14)
+
+par(mfrow=c(1,3))
+
+bics3<-summary(reg.stp)$bic
+
+plot(1:14,bics,type="l",ylab="BIC",xlab="# of predictors")
+
+index3<-which(bics3==min(bics3))
+
+points(index3,bics[index3],col="red",pch=10)
+
+adjr3<-summary(reg.stp)$adjr
+
+plot(1:14,adjr3,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+
+index3<-which(adjr3==max(adjr3))
+
+points(index3,adjr3[index3],col="red",pch=10)
+
+rss3<-summary(reg.stp)$rss
+
+plot(1:14,rss3,type="l",ylab="train RSS",xlab="# of predictors")
+
+index3<-which(rss3==min(rss3))
+
+points(index3,rss[index3],col="red",pch=10)
+
+mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
+
+# -> 11 predictors
+```
+
+
+# Variable selection - LASSO
+```{r}
+library(glmnet)
+
+x=model.matrix(life_expectancy~.,train)[,-1]
+y=log(train$life_expectancy)
+
+xtest<-model.matrix(life_expectancy~.,test)[,-1]
+ytest<-log(test$life_expectancy)
+
+grid=10^seq(10,-2, length =100)
+lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
+
+cv.out=cv.glmnet(x,y,alpha=1) #alpha=1 performs LASSO
+plot(cv.out)
+
+bestlambda<-cv.out$lambda.min  #Optimal penalty parameter.  You can make this call visually.
+lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
+
+testMSE_LASSO<-mean((ytest-lasso.pred)^2)
+testMSE_LASSO
+
+coef(lasso.mod,s=bestlambda)
+
+reg.lso <- lm(life_expectancy~. -infant_deaths -alcohol -hepatitis_b -measles -total_expenditure, data=Life)
+```
+
+
+# cross validating the models 
+```{r}
+testASEfwd<-c()
+testASEbwd<-c()
+testASEstp<-c()
+
+for (i in 1:14){
+  # predicting the forward model on test set
+  predictionsfwd<-predict.regsubsets(object=reg.fwd,newdata=test,id=i)
+  testASEfwd[i]<-mean((test$life_expectancy-predictionsfwd)^2)
+  
+  # predicting the backward model on test set
+  predictionsbwd<-predict.regsubsets(object=reg.bwd,newdata=test,id=i)
+  testASEbwd[i]<-mean((test$life_expectancy-predictionsbwd)^2)
+  
+  # predicting stepwise model on test set
+  predictionsstp<-predict.regsubsets(object=reg.stp,newdata=test,id=i)
+  testASEstp[i]<-mean((test$life_expectancy-predictionsstp)^2)
+  
+}
+
+```
+
+
+# plots for something - ASE
+```{r}
+par(mfrow=c(1,1))
+plot(1:14,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+index<-which(testASEfwd==min(testASEfwd))
+points(index,testASEfwd[index],col="red",pch=10)
+rss<-summary(reg.fwd)$rss
+lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+mtext("ASE - Forward", side = 3, line = -2, outer = TRUE)
+
+
+par(mfrow=c(1,1))
+plot(1:14,testASEbwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+index<-which(testASEbwd==min(testASEbwd))
+points(index,testASEbwd[index],col="red",pch=10)
+rss<-summary(reg.bwd)$rss
+lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+mtext("ASE - Backward", side = 3, line = -2, outer = TRUE)
+
+
+par(mfrow=c(1,1))
+plot(1:14,testASEstp,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+index<-which(testASEstp==min(testASEstp))
+points(index,testASEstp[index],col="red",pch=10)
+rss3<-summary(reg.stp)$rss3
+lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+mtext("ASE - Stepwise", side = 3, line = -2, outer = TRUE)
+```
+
+
+# Using forward backward, and stepwise to select max number of variables:11
+```{r}
+# final variable selection for forward variable selection
+reg.finalfwd=regsubsets(life_expectancy~.,data=Life,method="forward",nvmax=11)
+coef(reg.finalfwd,10)
+
+final.modelfwd<-lm(life_expectancy~ status + year + adult_mortality + percentage_expenditure + measles + bmi + polio + diphtheria + hiv_aids + income_composition_of_resources + schooling, data=Life)
+
+summary(final.modelfwd)
+
+plot(final.modelfwd$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
+lines(c(20,110),c(20,110),col="red")
+mtext("Forward", side = 3, line = -2, outer = TRUE)
+
+
+
+
+# final variable selection for backward variable selection - the forward and backwards method selected the same model in this case
+reg.finalbwd=regsubsets(life_expectancy~. ,data=Life,method="backward",nvmax=11)
+coef(reg.finalbwd,10)
+
+final.modelbwd<-lm(life_expectancy~ status + year + adult_mortality + percentage_expenditure + measles + bmi + polio + diphtheria + hiv_aids + income_composition_of_resources + schooling,data=Life)
+
+summary(final.modelbwd)
+
+
+plot(final.modelbwd$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110))
+lines(c(20,110),c(20,110),col="red")
+mtext("Backward", side = 3, line = -2, outer = TRUE)
+
+
+
+
+# final variable selection for stepwise variable selection
+reg.finalstp=regsubsets(life_expectancy~.,data=Life,method="seqrep",nvmax=11)
+coef(reg.finalstp,10)
+
+final.modelstp <- lm(life_expectancy~.-total_expenditure -hepatitis_b -alcohol -infant_deaths, data=Life)
+
+summary(final.modelstp)
+
+plot(final.modelstp$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
+lines(c(20,110),c(20,110),col="red")
+mtext("Stepwise", side = 3, line = -2, outer = TRUE)
+
+
+# final variable selection for lasso variable selection
+final.modellso <- reg.lso
+
+summary(final.modellso)
+
+plot(final.modellso$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110), na.rm = TRUE )
+lines(c(20,110),c(20,110),col="red")
+mtext("Lasso", side = 3, line = -2, outer = TRUE)
+```
+
+
+# comparing the models
+```{r}
+
+# Function for Root Mean Squared Error
+RMSE <- function(error) { sqrt(mean(error^2)) }
+
+RMSE(final.modelfwd$residuals)
+RMSE(final.modelbwd$residuals)
+RMSE(final.modelstp$residuals)
+RMSE(final.modellso$residuals)
+
+
+summary(final.modelfwd)$adj.r.squared
+summary(final.modelbwd)$adj.r.squared
+summary(final.modelstp)$adj.r.squared
+summary(final.modellso)$adj.r.squared
+
+AIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
+BIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
 ```
