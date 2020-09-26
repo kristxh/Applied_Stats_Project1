@@ -1,15 +1,17 @@
 ---
 title: "6372 Project 1 - Life Expectancy"
+
 author: "By Kristi Herman, Bo Yun, Eric Romero, Neil Benson"
 date: "09/20/2020"
 output: word_document 
 ---
   
-  # Introduction
-  Introduction paragraphs here
+# Introduction
+Introduction paragraphs here
 
 ## Importing the necessary libraries
 ```{r,warning=FALSE,message=FALSE}
+
 library(ggplot2)
 library(ggthemes)
 library(gridExtra)
@@ -18,23 +20,28 @@ library(plyr)
 library(dplyr) 
 library(naniar) #keep
 library(zoo)
+
+
 # create not in operator
 `%notin%` <- Negate(`%in%`)
 
 ```
-
-
+  
+  
 ## Importing and Cleaning the Data
 ```{r,fig.height=6, fig.width=9,echo=FALSE,warning=FALSE,message=FALSE}
 ########### Loading the data
 life_ex_DF <- read.csv("https://raw.githubusercontent.com/kristxh/Applied_Stats_Project1/master/datasets_12603_17232_Life_Expectancy_Data.csv")
+
 # cleaning up column names
 colnames(life_ex_DF) <- tolower(colnames(life_ex_DF))
 colnames(life_ex_DF) <- gsub("\\.\\.",".",colnames(life_ex_DF))
 colnames(life_ex_DF) <- gsub("\\.","_",colnames(life_ex_DF))
 names(life_ex_DF)[19] <- "thinness_10_19_years"
+
 # reviewing the structure of the data
 str(life_ex_DF)
+
 # converting status to factor column
 life_ex_DF$status <- as.factor(life_ex_DF$status)
 ```
@@ -45,26 +52,35 @@ life_ex_DF$status <- as.factor(life_ex_DF$status)
 # checking for missing values in the data
 vis_miss(life_ex_DF) + xlab("Data Columns")
 ```
-
-
+  
+  
 ## fix missing data
 ```{r, fig.height=9, fig.width=9}
 # sorting the columns so that life_expectancy column is first
 life_ex_DF <- life_ex_DF %>% select("life_expectancy", everything())
+
 factorcols <- c("status","country","year")
 allcols <- colnames(life_ex_DF)
+
 # selecting only numerical columns for correlation
 corvars <- allcols[allcols %notin% factorcols]
+
+
 # impute with median missing values per country
 life_ex_median_DF <- as.data.frame(life_ex_DF %>%
-                                     group_by(country) %>%
-                                     mutate_at(corvars, na.aggregate, FUN=median))
+  group_by(country) %>%
+  mutate_at(corvars, na.aggregate, FUN=median))
+
+
 # dropping rows where the country has a single entry/record in the dataset and their records are mostly incomplete
 life_ex_median_DF <- life_ex_median_DF[!is.na(life_ex_median_DF$life_expectancy), ]
+
+
 # imputing the median by country still left a few nulls throughout. We will then impute the rest of the missing values as the mean of stats (developpoing, developed, by year)
 life_ex_cleaned_DF <- as.data.frame(life_ex_median_DF %>%
-                                      group_by(status,year) %>%
-                                      mutate_at(corvars, na.aggregate, FUN=median))
+  group_by(status,year) %>%
+  mutate_at(corvars, na.aggregate, FUN=median))
+
 # checking for missing values in the data
 vis_miss(life_ex_cleaned_DF) + xlab("Data Columns")
 ```
@@ -73,44 +89,6 @@ vis_miss(life_ex_cleaned_DF) + xlab("Data Columns")
 ```{r}
 summary(life_ex_cleaned_DF)
 ```
-
-# correlation matrix with pearson correlation coefficients
-```{r}
-library(reshape2)
-corr <- round(cor(life_ex_cleaned_DF[,corvars]),1)
-melted_cormat <- melt(corr)
-# Get lower triangle of the correlation matrix
-get_lower_tri<-function(cormat){
-  cormat[lower.tri(cormat)] <- NA
-  return(cormat)
-}
-
-# reorder the correlation matrix
-reorder_cormat <- function(cormat){
-  # Use correlation between variables as distance
-  dd <- as.dist((1-cormat)/2)
-  hc <- hclust(dd)
-  cormat <-cormat[hc$order, hc$order]
-}
-# reorder the correlation matrix
-corr <- reorder_cormat(corr)
-# get lower half
-lower_half <- get_lower_tri(corr)
-# reshape the correlation matrix
-melted_cormat <- melt(lower_half, na.rm = TRUE)
-# plot it
-ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
-  geom_tile(color = "white")+
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab", 
-                       name="Pearson\nCorrelation") +
-  theme_minimal()+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 8, hjust = 1), axis.title.x = element_blank(), axis.title.y = element_blank())+
-  coord_fixed()
-ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
-```
-
 
 # histogram of life_expectancy
 ```{r}
@@ -202,4 +180,89 @@ le_scatter <- geom_point(
   
 
 ggplot()+ le_scatter + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy: Developed and Developing Countries")  + scale_colour_manual(values=line_colors)
+```
+
+# correlation matrix with pearson correlation coefficients
+```{r}
+library(reshape2)
+
+corr <- round(cor(life_ex_cleaned_DF[,corvars]),1)
+melted_cormat <- melt(corr)
+
+
+# Get lower triangle of the correlation matrix
+  get_lower_tri<-function(cormat){
+    cormat[lower.tri(cormat)] <- NA
+    return(cormat)
+  }
+  
+
+# reorder the correlation matrix
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+
+# reorder the correlation matrix
+corr <- reorder_cormat(corr)
+
+# get lower half
+lower_half <- get_lower_tri(corr)
+
+# reshape the correlation matrix
+melted_cormat <- melt(lower_half, na.rm = TRUE)
+
+# plot it
+ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+  midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 8, hjust = 1), axis.title.x = element_blank(), axis.title.y = element_blank())+
+ coord_fixed()
+
+
+ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
+```
+
+
+# checking the significance of the factorial variables using ANOVA
+```{r}
+# convert categorical variables to factors
+names <- c("country", "year", "status")
+
+life_ex_cleaned_factor_DF <- life_ex_cleaned_DF
+
+# set the categorical columns to factor
+for (name in names)
+{
+  life_ex_cleaned_factor_DF[,name]<-factor(life_ex_cleaned_DF[,name])
+}
+
+# convert factors to numeric for factor analysis
+life_ex_cleaned_asnum_DF <- life_ex_cleaned_factor_DF[,names] %>% mutate_all(as.numeric)
+
+# adding suffix ASNUM to numerical representation of factors columns
+colnames(life_ex_cleaned_asnum_DF) <- paste(colnames(life_ex_cleaned_asnum_DF), "ASNUM", sep = "_")
+
+# adding numerical factor columns to base Df in order to perform stepwise for variable selection
+life_ex_cleaned_withnum_DF <- cbind(life_ex_cleaned_factor_DF, life_ex_cleaned_asnum_DF)
+
+# dropping factor columns
+life_ex_cleaned_withnum_DF <- life_ex_cleaned_withnum_DF[, sapply(life_ex_cleaned_withnum_DF, class) != "factor"]
+
+#  columns for anova factor analysis
+anovacols <- c(colnames(life_ex_cleaned_asnum_DF))
+
+#  creating the formula to pass into aov function
+anovafmla <- as.formula(paste("life_expectancy ~ ", paste(anovacols, collapse= "+")))
+
+# passing my auto generated formula to analyze
+anova_fit <- aov(anovafmla, data=life_ex_cleaned_withnum_DF)
+summary(anova_fit)
 ```
