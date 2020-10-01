@@ -488,16 +488,28 @@ mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
 library(glmnet)
 
 x=model.matrix(life_expectancy~.,train)[,-1]
-y=log(train$life_expectancy)
+y=train$life_expectancy
 
 xtest<-model.matrix(life_expectancy~.,test)[,-1]
-ytest<-log(test$life_expectancy)
+ytest<-test$life_expectancy
 
 grid=10^seq(10,-2, length =100)
 lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
 
+
+# LASSO regularization and rsquare plot
+plot(lasso.mod,xvar="lambda",label=TRUE)  # shows shrinkage and variable selection
+plot(lasso.mod,xvar="dev",label=TRUE)  # shows rsquare change as the number of variable changes
+
+# CV plot for LASSO
 cv.out=cv.glmnet(x,y,alpha=1) #alpha=1 performs LASSO
 plot(cv.out) #The output has 11 non-zero coefficients which shows that the function has chosen the second vertical second line on the cross-validation plot (within one standard error of the minimum) because cross validation error is measured with some variance.
+
+# Two vertical lines.
+# 1. The one is at the minimum(the one at 18)
+# 2. The other vertical line is within one standard error of the minimum(the one at 11). We have this line because cross validation error is measured with some variance. 
+
+# => The result chose the second line of 11 variables as seen in the plot(cv.out)
 
 bestlambda<-cv.out$lambda.min  #Optimal penalty parameter.  You can make this call visually.
 lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
@@ -505,9 +517,12 @@ lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
 testMSE_LASSO<-mean((ytest-lasso.pred)^2)
 testMSE_LASSO
 
-coef(lasso.mod,s=bestlambda)
 
-reg.lso <- lm(life_expectancy~. -infant_deaths -alcohol -hepatitis_b -measles -total_expenditure, data=Life)
+#Coefficients of the lasso model - Shows 11 variables (10 explanatory variables + 1 intercept), here's a coefficient function extractor that works on a cross validation object and pick the coefficient vector corresponding to the best model
+coef(lasso.mod,s=bestlambda)   
+
+# Recreating the final LASSO model based on variable selection
+reg.lso <- lm(life_expectancy~. -year -hepatitis_b, data=Life)
 ```
 
 
