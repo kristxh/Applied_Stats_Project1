@@ -69,7 +69,7 @@ vis_miss(life_ex_DF) + xlab("Data Columns")
 # sorting the columns so that life_expectancy column is first
 life_ex_DF <- life_ex_DF %>% select("life_expectancy", everything())
 
-factorcols <- c("status","country","year")
+factorcols <- c("status","country")
 allcols <- colnames(life_ex_DF)
 
 # selecting only numerical columns for correlation
@@ -108,20 +108,6 @@ t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,sd))
 BMI has some very weird mins and maxes. Will explore further, but this data may later show correlations that aren't actually there because the min and max of BMI are not practical or possible.  
 
 
-## BMI Boxplot by status (developing, developed)
-```{r, fig.height=7, fig.width=9}
-bmi_box <- geom_boxplot(
-  mapping = aes(y=bmi),
-  data = life_ex_cleaned_DF,
-  colour = "black",
-  fill = "#56B4E9",
-  groupColors=c('#999999','#E69F00')
-)
-
-ggplot()+ bmi_box + xlab("BMI") + ggtitle("BMI")
-
-```
-
 ## Histogram of life_expectancy
 ```{r, fig.height=7, fig.width=9}
 theme_set(theme_igray())
@@ -153,15 +139,8 @@ le_line <- geom_line(
 ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average Life Expectancy: 2000 - 2015") 
 
 ```
+Life Expectancy is linearly related to year, and year should be treated as continuous instead of as a factor in this model. We will drop BMI for having unrealistic range of data, and no way to correct for it.
 
-##################
-
-
-Life Expectancy is linearly related to year, and year should be treated as continuous instead of as a factor in this model
-
-DROP BMI for having unrealistic range of data
-
-##################
 
 ## Developed/Developing Life Expectancy
 ```{r, fig.height=7, fig.width=9}
@@ -194,7 +173,6 @@ dev_box <- geom_boxplot(
 ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitle("Life Expectancy: Developed and Developing Countries ")
 
 ```
-
 There appears to be enough of a difference between `life_expectancy` mean by developed and developing `status`. We will perform an anova and analyze signifance in the difference in means. 
 
 
@@ -217,7 +195,7 @@ ggplot()+ yr_box + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(b
 ## Checking the significance of the factorial variables using ANOVA
 ```{r}
 # convert categorical variables to factors
-names <- c("country", "year", "status")
+names <- c("country", "status")
 
 life_ex_cleaned_factor_DF <- life_ex_cleaned_DF
 
@@ -260,26 +238,15 @@ Ha: μdeveloped ≠ μdeveloping
 
 Reject H0 that the means are equal  
 
-This is statistically significant (p-value <2e-16), and we will include status as a factor to cconsider in the model.  
-
-### Testing the life_expectancy mean difference by year  
-Equal means model significance here to test significance of mean difference of `life_expectancy` between years.  
-
-
-H0: μ2000 = μ2001 = μ2002 = μ2003 = μ2004 = μ2005 = μ2006 = μ2007 = μ2008 = μ2009 = μ2010 = μ2011 = μ2012 = μ2013 = μ2014 = μ2015  
-Ha: μ2000 ≠ μ2001 ≠ μ2002 ≠ μ2003 ≠ μ2004 ≠ μ2005 ≠ μ2006 ≠ μ2007 ≠ μ2008 ≠ μ2009 ≠ μ2010 ≠ μ2011 ≠ μ2012 ≠ μ2013 ≠ μ2014 ≠ μ2015  
-
-Reject H0 that the means are equal  
-
-This is statistically significant (p-value <2e-16), and we will include year as a factor to cconsider in the model.  
+This is statistically significant (p-value <2e-16), and we will include status as a factor to consider in the model.  
 
 
 ### Both year and status are statistically significant as categorical predictors. 
-Later will remove `country` from the data set for variable selection.  
+Later will remove `country` from the data set for variable selection (p-value 0.367).
 
 
 ## Scatterplot boxplot
-```{r fig.width=10, fig.height=7}
+```{r, fig.height=7, fig.width=9}
 le_scatter <- geom_point(
   mapping = aes(x=year, y=life_expectancy, color=status),
   data = life_ex_cleaned_DF
@@ -338,10 +305,10 @@ ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
 ```
 It appears there is a high degree of correlation between the following:  
-- `thinnes_5_9_years` & `thinnes_10_19_years`  
-- `percentage_expenditure` & `gdp`  
-- `under_5_deaths` & `infant_deaths`  
-- `schooling` & `income_composition_of_resources`  
+- `thinnes_5_9_years` & `thinnes_10_19_years`: 0.9  
+- `percentage_expenditure` & `gdp`: 0.9  
+- `under_5_deaths` & `infant_deaths`: 1.0  
+- `schooling` & `income_composition_of_resources`: 0.8  
 - `population` has 0 correlation with the response variable and will be removed as a predictor and is incomplete throughout the data set  
 
 
@@ -352,9 +319,6 @@ pairs(life_ex_cleaned_DF[,corvars], pch = 19,  cex = 0.5,
       upper.panel=NULL)
 
 ```
-It appears that both `hiv_aids` and `percentage_expenditure` have nonlinear relationships with the response variable. We will further investigate.  
-
-There also appears to be some interaction between `status` and `percentage_expenditure`, `status` and `schooling`, and `status` and `bmi`. Further exploration needed.
 
 
 ## Further exploration of hiv_ads and percentage_expenditure
@@ -366,6 +330,9 @@ plot(life_ex_cleaned_DF$hiv_aids,life_ex_cleaned_DF$life_expectancy, xlab="hiv_a
 
 plot(life_ex_cleaned_DF$percentage_expenditure,life_ex_cleaned_DF$life_expectancy, xlab="percentage_expenditure",ylab="life_expectancy")
 ```
+It appears that both `hiv_aids` and `percentage_expenditure` have nonlinear relationships with the response variable. We will further investigate.  
+
+There also appears to be some interaction between `status` and `percentage_expenditure`, and `status` and `schooling`. Further exploration needed.
 
 
 ```{r, fig.height=7, fig.width=9}
@@ -437,7 +404,7 @@ full.model <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars])
 vif(full.model, data = life_ex_cleaned_DF)
 
 # removing columns and re-evaluating
-colstodelete <- c("under_five_deaths", "thinness_5_9_years", "gdp", "population")
+colstodelete <- c("under_five_deaths", "thinness_5_9_years", "gdp", "population", "bmi")
 
 full.model1 <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars] %>% select(-all_of(colstodelete)))
 
@@ -454,7 +421,8 @@ vif(full.model1, data = life_ex_cleaned_DF[,corvars] %>% select(-all_of(colstode
   
 
 ## Removing columns with high colinearity or low significance
-"under_five_deaths", "thinness_5_9_years", "gdp", "population" and "country"  
+"under_five_deaths", "thinness_5_9_years", "gdp", "population" and "country"
+Removing "bmi" as a result of unrealistic data
 ```{r}
 # adding "country" to the list of columns to delete after its poor performance in ANOVA analysis
 colstodelete <- append(colstodelete, "country")  
@@ -469,22 +437,31 @@ full.model <- lm(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditu
 par(mfrow=c(2,2))
 plot(full.model)
 ```
-
+#####################
+ADD COMMENTARY HERE ABOUT CHECKING THE RESIDUALS OF THE MODEL
+#####################
 
 ## Adding interaction and checking significance
 Visual assessment of pair plots showed potential interactions between the following:  
-
 - `status` >> `percentage_expenditure`  
-- `status` >> `bmi`  
-- `status` >> `schooling`
+- `status` >> `schooling`  
+
+
 ```{r, fig.height=7, fig.width=9}
-full.modelwinter <- lm(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure + status:bmi + status:schooling, data=Life)
+full.modelwinter <- lm(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure + status:schooling, data=Life)
 
 # Re-assessing the residual plots and assumptions
 par(mfrow=c(2,2))
 plot(full.modelwinter)
 summary(full.modelwinter)
 ```
+Upon further examination, we find that the following are insignificant and will be fruther analyzesd for removal from the model:  
+- `year`
+- `infant_deaths`
+- `alcohol`
+- `hepatitis_b`
+- `total_expenditure`
+- `status:schooling` interaction
 
 
 ## Splitting the data into test and training sets for cross validation
@@ -517,85 +494,85 @@ predict.regsubsets = function (object , newdata ,id ,...){
 # Just the training set
 library(leaps)
 
-reg.fwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, data=train, method="forward", nvmax=24)
+reg.fwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure, data=train, method="forward", nvmax=18)
 
 par(mfrow=c(1,3))
 
 # BIC
 bics<-summary(reg.fwd)$bic
-plot(1:24,bics,type="l",ylab="BIC",xlab="# of predictors")
+plot(1:18,bics,type="l",ylab="BIC",xlab="# of predictors")
 index<-which(bics==min(bics))
 points(index,bics[index],col="red",pch=10)
 
 # Adjusted R2
 adjr2<-summary(reg.fwd)$adjr2
-plot(1:24,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+plot(1:18,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index<-which(adjr2==max(adjr2))
 points(index,adjr2[index],col="red",pch=10)
 
 # RSS
 rss<-summary(reg.fwd)$rss
-plot(1:24,rss,type="l",ylab="train RSS",xlab="# of predictors")
+plot(1:18,rss,type="l",ylab="train RSS",xlab="# of predictors")
 index<-which(rss==min(rss))
 points(index,rss[index],col="red",pch=10)
 mtext("Variable selection - Forward", side = 3, line = -2, outer = TRUE)
 
-# -> 15 predictors
+# -> 12 predictors
 ```
 
 
 ## Variable selection - Backward
 ```{r, fig.height=7, fig.width=9}
 # Just the training set
-reg.bwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, data=train, method="backward", nvmax=24)
+reg.bwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure, data=train, method="backward", nvmax=18)
 
 par(mfrow=c(1,3))
 
 # BIC
 bics2<-summary(reg.bwd)$bic
-plot(1:24,bics2,type="l",ylab="BIC",xlab="# of predictors")
+plot(1:18,bics2,type="l",ylab="BIC",xlab="# of predictors")
 index2<-which(bics2==min(bics2))
 points(index2,bics2[index2],col="red",pch=10)
 
 # Adjusted R2
 adjr2<-summary(reg.bwd)$adjr2
-plot(1:24,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+plot(1:18,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index.r2<-which(adjr2==max(adjr2))
 points(index.r2,adjr2[index.r2],col="red",pch=10)
 
 # RSS
 rss2<-summary(reg.bwd)$rss
-plot(1:24,rss2,type="l",ylab="train RSS",xlab="# of predictors")
+plot(1:18,rss2,type="l",ylab="train RSS",xlab="# of predictors")
 index.rss2<-which(rss2==min(rss2))
 points(index.rss2,rss[index.rss2],col="red",pch=10)
 mtext("Variable selection - Backward", side = 3, line = -2, outer = TRUE)
 
-# -> 13 predictors
+# -> 12 predictors
 ```
 
 
 ## Variable selection - Stepwise
 ```{r, fig.height=7, fig.width=9}
 # Just the training set
-reg.stp=regsubsets(life_expectancy~. + hiv_aids^2 + sqrt(percentage_expenditure) + status*percentage_expenditure + status*bmi + status*schooling, data=train, method="seqrep", nvmax=24)
+reg.stp=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure, data=train, method="seqrep", nvmax=18)
 
 par(mfrow=c(1,3))
 
 # BIC
 bics3<-summary(reg.stp)$bic
-plot(1:24,bics,type="l",ylab="BIC",xlab="# of predictors")
+plot(1:18,bics,type="l",ylab="BIC",xlab="# of predictors")
 index3<-which(bics3==min(bics3))
 points(index3,bics[index3],col="red",pch=10)
 
 # Adjusted R2
 adjr3<-summary(reg.stp)$adjr
-plot(1:24,adjr3,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
+plot(1:18,adjr3,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index3<-which(adjr3==max(adjr3))
 points(index3,adjr3[index3],col="red",pch=10)
 
 # RSS
 rss3<-summary(reg.stp)$rss
-plot(1:24,rss3,type="l",ylab="train RSS",xlab="# of predictors")
+plot(1:18,rss3,type="l",ylab="train RSS",xlab="# of predictors")
 index3<-which(rss3==min(rss3))
 points(index3,rss[index3],col="red",pch=10)
 mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
@@ -609,11 +586,11 @@ mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
 library(glmnet)
 
 
-x=model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, train)[,-1]
-y=log(train$life_expectancy)
+x=model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure, train)[,-1]
+y=train$life_expectancy
 
-xtest<-model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, test)[,-1]
-ytest<-log(test$life_expectancy)
+xtest<-model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure, test)[,-1]
+ytest<-test$life_expectancy
 
 
 grid=10^seq(10,-2, length =100)
@@ -645,7 +622,10 @@ testMSE_LASSO
 coef(lasso.mod,s=bestlambda)   
 
 # Recreating the final LASSO model based on variable selection
-reg.lso <- lm(life_expectancy~. -year -hepatitis_b, data=Life)
+# reg.lso <- lm(life_expectancy ~ adult_mortality + polio + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling + I(sqrt(percentage_expenditure)), data=Life)
+
+reg.lso <- lm(life_expectancy ~ adult_mortality + measles + polio + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling + I(sqrt(percentage_expenditure)), data=Life)
+
 ```
 
 
@@ -655,7 +635,7 @@ testASEfwd<-c()
 testASEbwd<-c()
 testASEstp<-c()
 
-for (i in 1:24){
+for (i in 1:18){
   # predicting the forward model on test set
   predictionsfwd<-predict.regsubsets(object=reg.fwd,newdata=test,id=i)
   testASEfwd[i]<-mean((test$life_expectancy-predictionsfwd)^2)
@@ -673,58 +653,48 @@ for (i in 1:24){
 ```
 
 
-## Plots for something - ASE
+## Plots for ASE
 ```{r}
 par(mfrow=c(1,1))
-plot(1:24,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:18,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEfwd==min(testASEfwd))
 points(index,testASEfwd[index],col="red",pch=10)
 rss<-summary(reg.fwd)$rss
-lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:18,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Forward", side = 3, line = -2, outer = TRUE)
 
 
 par(mfrow=c(1,1))
-plot(1:24,testASEbwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:18,testASEbwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEbwd==min(testASEbwd))
 points(index,testASEbwd[index],col="red",pch=10)
 rss<-summary(reg.bwd)$rss
-lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:18,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Backward", side = 3, line = -2, outer = TRUE)
 
 
 par(mfrow=c(1,1))
-plot(1:24,testASEstp,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:18,testASEstp,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEstp==min(testASEstp))
 points(index,testASEstp[index],col="red",pch=10)
 rss3<-summary(reg.stp)$rss3
-lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:18,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Stepwise", side = 3, line = -2, outer = TRUE)
 ```
 
 
-## Using forward backward, and stepwise to select max number of variables:11
+
+## Using forward backward, and stepwise to select max number of variables
 ```{r}
-# final variable selection for forward variable selection
-reg.finalfwd=regsubsets(life_expectancy~.,data=Life,method="forward",nvmax=11)
-coef(reg.finalfwd,10)
 
-final.modelfwd<-lm(life_expectancy~ status + year + adult_mortality + percentage_expenditure + measles + bmi + polio + diphtheria + hiv_aids + income_composition_of_resources + schooling, data=Life)
-
-summary(final.modelfwd)
-
-plot(final.modelfwd$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
-lines(c(20,110),c(20,110),col="red")
-mtext("Forward", side = 3, line = -2, outer = TRUE)
-
-
+# the forward and backward models are exactly the same, we will proceed in analyzing only the bakward model
 
 
 # final variable selection for backward variable selection - the forward and backwards method selected the same model in this case
-reg.finalbwd=regsubsets(life_expectancy~. ,data=Life,method="backward",nvmax=11)
+reg.finalbwd=regsubsets(life_expectancy~. ,data=Life,method="backward",nvmax=12)
 coef(reg.finalbwd,10)
 
-final.modelbwd<-lm(life_expectancy~ status + year + adult_mortality + percentage_expenditure + measles + bmi + polio + diphtheria + hiv_aids + income_composition_of_resources + schooling,data=Life)
+final.modelbwd <- lm(life_expectancy ~ status + adult_mortality + percentage_expenditure + measles + polio + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling + status:percentage_expenditure + I(hiv_aids^2) + I(sqrt(percentage_expenditure)), data=Life)
 
 summary(final.modelbwd)
 
@@ -737,10 +707,10 @@ mtext("Backward", side = 3, line = -2, outer = TRUE)
 
 
 # final variable selection for stepwise variable selection
-reg.finalstp=regsubsets(life_expectancy~.,data=Life,method="seqrep",nvmax=11)
+reg.finalstp=regsubsets(life_expectancy~.,data=Life,method="seqrep",nvmax=13)
 coef(reg.finalstp,10)
 
-final.modelstp <- lm(life_expectancy~.-total_expenditure -hepatitis_b -alcohol -infant_deaths, data=Life)
+final.modelstp <- lm(life_expectancy ~ status + adult_mortality + percentage_expenditure + measles + polio + total_expenditure + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling + status:percentage_expenditure + I(hiv_aids^2) + I(sqrt(percentage_expenditure)), data=Life)
 
 summary(final.modelstp)
 
@@ -754,242 +724,114 @@ final.modellso <- reg.lso
 
 summary(final.modellso)
 
-plot(final.modellso$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110), na.rm = TRUE )
+plot(final.modellso$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110))
 lines(c(20,110),c(20,110),col="red")
 mtext("Lasso", side = 3, line = -2, outer = TRUE)
 ```
 
+
+## ANOVA lack of fit test between backward and lasso model
+```{r}
+anova(final.modelbwd, final.modellso)
+```
+H0:  Backward Model Fit = Lasso Model Fit  
+Ha:  Backward Model Fit != Lasso Model Fit  
+
+There is sufficient evidence to suggest that these models do not fit the data the same.  
+
+Reject H0
+
+p-value: < 2.2e-16  
+
+
+## ANOVA lack of fit test between stepwise and backward model
+```{r}
+anova(final.modelstp, final.modelbwd)
+```
+H0:  Stepwise Model Fit = Backward Model Fit  
+Ha:  Stepwise Model Fit != Backward Model Fit  
+
+There is not enough evidence to suggest that these models fit the data differently.  
+
+Fail to reject H0
+
+p-value: 0.095
+
+## Using forward backward, and stepwise to select max number of variables
+```{r}
+# final predictive model
+final.predictive <- final.modelstp
+
+
+summary(final.predictive)
+
+
+plot(final.predictive$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
+lines(c(20,110),c(20,110),col="red")
+mtext("Stepwise", side = 3, line = -2, outer = TRUE)
+
+
+
+# final interpretable model
+final.interpretable <- lm(life_expectancy ~ status + adult_mortality + percentage_expenditure + measles + polio + total_expenditure + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling, data=Life)
+
+summary(final.interpretable)
+confint(final.interpretable)
+
+plot(final.interpretable$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
+lines(c(20,110),c(20,110),col="red")
+mtext("Stepwise", side = 3, line = -2, outer = TRUE)
+```
+
+
+## ANOVA lack of fit test between stepwise and backward model
+```{r}
+anova(final.predictive, final.interpretable)
+```
+H0:  Predictive Model Fit = Interpretable Model Fit  
+Ha:  Predictive Model Fit != Interpretable Model Fit  
+
+There is sufficient evidence to suggest that these models do not fit the data the same.  
+
+Reject H0
+
+p-value: < 2.2e-16
 
 ## Comparing the models
 ```{r}
 
 # Function for Root Mean Squared Error
 RMSE <- function(error) { sqrt(mean(error^2)) }
+ASE <- function(error) { mean(error^2) }
 
-RMSE(final.modelfwd$residuals)
 RMSE(final.modelbwd$residuals)
 RMSE(final.modelstp$residuals)
 RMSE(final.modellso$residuals)
+RMSE(final.interpretable$residuals)
 
+ASE(final.modelbwd$residuals)
+ASE(final.modelstp$residuals)
+ASE(final.modellso$residuals)
+ASE(final.interpretable$residuals)
 
-summary(final.modelfwd)$adj.r.squared
 summary(final.modelbwd)$adj.r.squared
-summary(final.modelstp)$adj.r.squared
+summary(final.predictive)$adj.r.squared
 summary(final.modellso)$adj.r.squared
+summary(final.interpretable)$adj.r.squared
 
-AIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
-BIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
-```
-## Option 1 for interpretable model
-Quesiton of Interest:  Is there a relationship between schooling and life expectancy?  If so, is there an interaction with status?
 
-## Model Selection
-Question of Interest
-
-```{r}
-# Cross Validation on Train vs Test 
-# Splitting 2939 observations of the data into Training and Test set in the ratio of 70:30
-set.seed(1234)
-trainIndices = sample(seq(1:dim(Life)[1]),round(.7*dim(Life)[1]))
-train = Life[trainIndices,]
-test = Life[-trainIndices,]
-
+AIC(final.modelbwd, final.predictive, final.modellso, final.interpretable)
+BIC(final.modelbwd, final.modelstp, final.modellso, final.interpretable)
 ```
 
-```{r}
-model_fit <- lm(life_expectancy ~ schooling + status + status*schooling, data=train)
-summary(model_fit)
+## Model Summary
+We see that isn't enough evidence to suggest that the fit between stepwise and backward is different. We do see that both of them are indicated to be better fitting than the lasso model. Additional evidence suggests that both the stepwise and bakward models returned lower diagostic fit metrics in RMSE, BIC, and AIC, and higher Adjusted R Squared compared to the lasso model.
 
-model_pre <- predict(model_fit, interval = "predict", newdata=test)
-model_pre
+| Model         | ASE      | RMSE     | Adj R^2   | AIC      | BIC      | DF |
+|---------------|----------|----------|-----------|----------|----------|----|
+| Lasso         | 17.29395 | 4.1586   | 0.8086831 | 16677.15 | 16742.95 | 11 |
+| Interpretable | 17.443   | 4.176481 | 0.8069019 | 16706.28 | 16784.04 | 13 |
+| Backward      | 15.41182 | 3.925789 | 0.8292704 | 16347.78 | 16437.51 | 15 |
+| Stepwise      | 15.39709 | 3.923912 | 0.8293751 | 16346.98 | 16442.69 | 16 |
 
-```
-
-
-## Checking Assumptions
-
-There is a strong linear relationship between schooling and life_expectancy
-```{r fig.width=10,fig.height=10}
-ggplot(life_exp_wo_0, aes(x=schooling, y = life_expectancy)) + geom_point() + geom_smooth(method= "lm");
-
-```
-
-There is visual evidence of an interaction between status and schooling
-```{r fig.width=10,fig.height=10}
-ggplot(life_exp_wo_0, aes(x=schooling, y = life_expectancy, colour = status)) + geom_point() + geom_smooth(method= "lm") + scale_color_manual(values = c("dodgerblue4", "#D55E00"));
-```
-
-```{r}
-MSPE <- mean((model_pre[,1] - test$life_expectancy)^2)
-MSPE
-            
-```
-## Checking Residuals and Normality
-There are 22 outliers with "O" schooling.  Based on other data for the countries that are missing data, it seems that data may not have been gathered for the years with a 0 value for schooling.  The outliers were left in because they do not have high influence.
-```{r}
-par(mfrow=c(2,2))
-plot(model_fit)
-summary(Life$schooling)
-
-res <- resid(model_fit)
-plot(Life$life_expectancy, res, xlab = "X",ylab = "Residual", main = "Residuals")
-```
-```{r}
-mysummary<-function(x){
-  result<-c(length(x),mean(x),sd(x),sd(x)/length(x), min(x), max(x), IQR(x))
-  names(result)<-c("N","Mean","SD","SE", "Min", "Max", "IQR")
-  return(result)
-}
-sumstats<-aggregate(life_expectancy~schooling*status,data=Life,mysummary)
-sumstats<-cbind(sumstats[,1:2],sumstats[,-(1:2)])
-sumstats
-```
-
-```{r fig.width=20, fig.height=10}
-ggplot(sumstats,aes(x=schooling,y=Mean,group=status,colour=status))+
-  ylab("Life Expectancy")+
-  geom_line()+
-  geom_point()+
-  geom_errorbar(aes(ymin=Mean-SD,ymax=Mean+SD),width=.1) +
-  scale_color_manual(values = c("dodgerblue4", "#D55E00"));
-```
-
-```{r}
-# Final model on whole data set
-final.model<-lm(life_expectancy~schooling+status+schooling*status,data=Life)
-summary(final.model)
-
-plot(final.model$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(40,90),ylim=c(20,100))
-lines(c(40, 90),c(20,100),col="red")
-
-```
-
-
-```{r}
-# Studentized Residuals
-sres <- studres(model_fit)
-hist(sres, freq=FALSE,
-     main="Distribution of Studentized Residuals", xlab="Residuals")
-xfit<-seq(min(sres-1),max(sres)+1,length=60)
-yfit<-dnorm(xfit)
-lines(xfit, yfit, col="darkblue", lwd=2)
-
-```
-#### Hypothesis test
-
-The full model used here includes schooling, status, and the interactions between schooling and status.  The reduced model status and schooling.
-Ho:  Full model = Reduced Model
-Ha:  Full model != Reduced Model
-```{r}
-full.model <- lm(life_expectancy~schooling+status+schooling*status,data=Life)
-summary(full.model)
-reduced.model <- lm(life_expectancy~schooling+status,data=Life)
-summary(reduced.model)
-
-```
-
-**Conclusion:**  There is sufficient evidence that the full model is different than the reduced model (p-value < 0.0001) from a partial f-test.
-
-```{r}
-anova(reduced.model,full.model)
-```
-
-** Interpretation **
-For every 1-year increase in schooling, the increase in the mean estimated life expectancy is .98 years for people in developed countries (p-value < 0.0001).  The life expectancy in Developing countries is estimated to be 19.5 years less than mean life expectancy in Developed countries (for countries with zero education), but for every year increase in schooling, the mean life expectancy is estimated to be 1.06 that of  Developed countries (p-value < 0.0001).  
-
-** Confidence Intervals **
--TBD
-
-#### Option 2 for interpretable model - use Random Forest for Model Selection
-
-```{r, fig.width=12, fig.height=6}
-# Random Forest Train/Test split
-library(MASS)
-library(randomForest)
-set.seed(1234)
-trainIndices = sample(1:nrow(Life), nrow(Life)/2)
-tree.test = Life[-trainIndices,"life_expectancy"]
-
-```
-
-```{r}
-
-# Prediction
-rf.le = randomForest(life_expectancy~.,data=Life,subset=trainIndices, mtry=6, importance=TRUE)
-yhat.rf = predict(rf.le, newdata = test)
-mean((yhat.rf-tree.test)^2)
-
-# Plot
-plot(yhat.rf,tree.test)
-abline(0,1)
-mean((yhat.bag-tree.test)^2)
-
-# Importance of variables
-importance(rf.le)
-varImpPlot(rf.le)
-
-```
-
-```{r}
-# Create a multiple regression model using the variables found above (hiv_aids + income_composition_of_resources + adult_mortality + schooling + status)
-set.seed(1234)
-trainIndicesLM = sample(seq(1:dim(Life)[1]),round(.7*dim(Life)[1]))
-trainLM = Life[trainIndicesLM,]
-testLM = Life[-trainIndicesLM,]
-dim(trainLM)
-dim(testLM)
-
-```
-
-```{r}
-# Fit the model
-model_fit <- lm(life_expectancy ~ hiv_aids + income_composition_of_resources + adult_mortality + schooling + status, data=trainLM)
-summary(model_fit)
-
-model_pre <- predict(model_fit, interval = "predict", newdata=testLM)
-model_pre
-
-```
-
-```{r}
-MSPE <- mean((model_pre[,1] - testLM$life_expectancy)^2)
-MSPE
-            
-```
-
-```{r}
-# Final model on whole data set
-final.model<-lm(life_expectancy~hiv_aids + income_composition_of_resources + adult_mortality + schooling + status,data=Life)
-summary(final.model)
-
-plot(final.model$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(40,90),ylim=c(20,100))
-lines(c(40, 90),c(20,100),col="red")
-
-```
-
-**Compare Results to Fwd, Bwd, Stepwise, LASSO**
-
-
-#### Hypothesis test
-The full model used here includes all the variables selected from a stepwise regression.  The reduced model includes the top variables from a Random Forest along with the status variable.
-Ho:  Full model = Reduced Model
-Ha:  Full model != Reduced Model
-```{r}
-# Build full and reduced models
-reduced.model <- lm(life_expectancy~hiv_aids + income_composition_of_resources + adult_mortality + schooling + status,data=Life)
-summary(reduced.model)
-full.model <- lm(life_expectancy~.-total_expenditure -hepatitis_b -alcohol -infant_deaths, data=Life)
-summary(full.model)
-```
-
-**Conclusion:** The full model is significantly different than the reduced model (p-value < 0.001) from a partial f-test.
-```{r}
-# Build full and reduced models
-anova(reduced.model,full.model)
-```
-
-**Interpretation:**
-TBD
-
-**Confidence Intervals**
-TBD
+We will proceed with the stepwise model as it has a slightly lower RMSE, higher Adjusted R Squared, lower AIC, and an additional degree of freedom; even though we see lower lower BIC from the backward model.
