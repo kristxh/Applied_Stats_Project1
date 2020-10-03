@@ -654,7 +654,7 @@ for (i in 1:18){
 
 
 ## Plots for ASE
-```{r}
+```{r, fig.height=7, fig.width=9}
 par(mfrow=c(1,1))
 plot(1:18,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEfwd==min(testASEfwd))
@@ -685,7 +685,7 @@ mtext("ASE - Stepwise", side = 3, line = -2, outer = TRUE)
 
 
 ## Using forward backward, and stepwise to select max number of variables
-```{r}
+```{r, fig.height=7, fig.width=9}
 
 # the forward and backward models are exactly the same, we will proceed in analyzing only the bakward model
 
@@ -730,7 +730,7 @@ mtext("Lasso", side = 3, line = -2, outer = TRUE)
 ```
 
 
-## ANOVA lack of fit test between backward and lasso model
+## ANOVA lack of fit test between final predictive model and interpretable model
 ```{r}
 anova(final.modelbwd, final.modellso)
 ```
@@ -758,7 +758,7 @@ Fail to reject H0
 p-value: 0.095
 
 ## Using forward backward, and stepwise to select max number of variables
-```{r}
+```{r, fig.height=7, fig.width=9}
 # final predictive model
 final.predictive <- final.modelstp
 
@@ -775,15 +775,22 @@ mtext("Stepwise", side = 3, line = -2, outer = TRUE)
 # final interpretable model
 final.interpretable <- lm(life_expectancy ~ status + adult_mortality + percentage_expenditure + measles + polio + total_expenditure + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling, data=Life)
 
-plot(final.interpretable)
 
 summary(final.interpretable)
 confint(final.interpretable)
 
 plot(final.interpretable$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(20,110),ylim=c(20,110) )
 lines(c(20,110),c(20,110),col="red")
-mtext("Stepwise", side = 3, line = -2, outer = TRUE)
+mtext("Interpretable", side = 3, line = -2, outer = TRUE)
 ```
+
+
+
+```{r, fig.height=7, fig.width=9}
+par(mfrow=c(2,2))
+plot(final.interpretable)
+```
+
 
 
 ## ANOVA lack of fit test between stepwise and backward model
