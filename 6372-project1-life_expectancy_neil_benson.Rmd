@@ -28,7 +28,18 @@ library(zoo)
 `%notin%` <- Negate(`%in%`)
 
 ```
-  
+## Introduction
+What factors impact life expectancy?  Can life expectancy be predicted?  The World Health Organization (WHO) maintains a database with life expectancy information for all countries by year along with other variables that could contribute to life expectancy.  The data falls into four main areas:  health, economic, social, and immunization.  This project makes use of the WHO data to better understand life expectancy and how to predict it.  In this paper, three different models will be explored:
+1)      A regression model to identify key relationships between life expectancy and factors related to health, economic, social, and immunization.
+2)      A parametric regression model to predict life expectancy.
+3)      A non-parametric regression model to predict life expectancy.
+
+
+## Data Description
+The Life Expectancy dataset used in this analysis was collected from the WHO and made available at Kaggle:  https://www.kaggle.com/kumarajarshi/life-expectancy-who.  It includes data from 193 countries for the years 2000 – 2015.  The 2938 rows contained in the dataset include average life expectancy per country for each year.  In addition to the average life expectancy, there are 21 columns of data related to health, economic, social, and immunization.   
+
+
+## Exploratory Data Analysis
   
 ## Importing and Cleaning the Data
 ```{r, warning=FALSE, message=FALSE}
@@ -597,17 +608,31 @@ mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
 ```{r, fig.height=7, fig.width=9}
 library(glmnet)
 
+
 x=model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, train)[,-1]
 y=log(train$life_expectancy)
 
 xtest<-model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, test)[,-1]
 ytest<-log(test$life_expectancy)
 
+
 grid=10^seq(10,-2, length =100)
 lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
 
+
+# LASSO regularization and rsquare plot
+plot(lasso.mod,xvar="lambda",label=TRUE)  # shows shrinkage and variable selection
+plot(lasso.mod,xvar="dev",label=TRUE)  # shows rsquare change as the number of variable changes
+
+# CV plot for LASSO
 cv.out=cv.glmnet(x,y,alpha=1) #alpha=1 performs LASSO
-plot(cv.out)
+plot(cv.out) #The output has 11 non-zero coefficients which shows that the function has chosen the second vertical second line on the cross-validation plot (within one standard error of the minimum) because cross validation error is measured with some variance.
+
+# Two vertical lines.
+# 1. The one is at the minimum(the one at 18)
+# 2. The other vertical line is within one standard error of the minimum(the one at 11). We have this line because cross validation error is measured with some variance. 
+
+# => The result chose the second line of 11 variables as seen in the plot(cv.out)
 
 bestlambda<-cv.out$lambda.min  #Optimal penalty parameter.  You can make this call visually.
 lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
@@ -615,9 +640,12 @@ lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
 testMSE_LASSO<-mean((ytest-lasso.pred)^2)
 testMSE_LASSO
 
-coef(lasso.mod,s=bestlambda)
 
-reg.lso <- lm(life_expectancy~. -infant_deaths -alcohol -hepatitis_b -measles -total_expenditure, data=Life)
+#Coefficients of the lasso model - Shows 11 variables (10 explanatory variables + 1 intercept), here's a coefficient function extractor that works on a cross validation object and pick the coefficient vector corresponding to the best model
+coef(lasso.mod,s=bestlambda)   
+
+# Recreating the final LASSO model based on variable selection
+reg.lso <- lm(life_expectancy~. -year -hepatitis_b, data=Life)
 ```
 
 
@@ -752,3 +780,216 @@ summary(final.modellso)$adj.r.squared
 AIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
 BIC(final.modelfwd,final.modelbwd, final.modelstp, final.modellso)
 ```
+## Option 1 for interpretable model
+Quesiton of Interest:  Is there a relationship between schooling and life expectancy?  If so, is there an interaction with status?
+
+## Model Selection
+Question of Interest
+
+```{r}
+# Cross Validation on Train vs Test 
+# Splitting 2939 observations of the data into Training and Test set in the ratio of 70:30
+set.seed(1234)
+trainIndices = sample(seq(1:dim(Life)[1]),round(.7*dim(Life)[1]))
+train = Life[trainIndices,]
+test = Life[-trainIndices,]
+
+```
+
+```{r}
+model_fit <- lm(life_expectancy ~ schooling + status + status*schooling, data=train)
+summary(model_fit)
+
+model_pre <- predict(model_fit, interval = "predict", newdata=test)
+model_pre
+
+```
+
+
+## Checking Assumptions
+
+There is a strong linear relationship between schooling and life_expectancy
+```{r fig.width=10,fig.height=10}
+ggplot(life_exp_wo_0, aes(x=schooling, y = life_expectancy)) + geom_point() + geom_smooth(method= "lm");
+
+```
+
+There is visual evidence of an interaction between status and schooling
+```{r fig.width=10,fig.height=10}
+ggplot(life_exp_wo_0, aes(x=schooling, y = life_expectancy, colour = status)) + geom_point() + geom_smooth(method= "lm") + scale_color_manual(values = c("dodgerblue4", "#D55E00"));
+```
+
+```{r}
+MSPE <- mean((model_pre[,1] - test$life_expectancy)^2)
+MSPE
+            
+```
+## Checking Residuals and Normality
+There are 22 outliers with "O" schooling.  Based on other data for the countries that are missing data, it seems that data may not have been gathered for the years with a 0 value for schooling.  The outliers were left in because they do not have high influence.
+```{r}
+par(mfrow=c(2,2))
+plot(model_fit)
+summary(Life$schooling)
+
+res <- resid(model_fit)
+plot(Life$life_expectancy, res, xlab = "X",ylab = "Residual", main = "Residuals")
+```
+```{r}
+mysummary<-function(x){
+  result<-c(length(x),mean(x),sd(x),sd(x)/length(x), min(x), max(x), IQR(x))
+  names(result)<-c("N","Mean","SD","SE", "Min", "Max", "IQR")
+  return(result)
+}
+sumstats<-aggregate(life_expectancy~schooling*status,data=Life,mysummary)
+sumstats<-cbind(sumstats[,1:2],sumstats[,-(1:2)])
+sumstats
+```
+
+```{r fig.width=20, fig.height=10}
+ggplot(sumstats,aes(x=schooling,y=Mean,group=status,colour=status))+
+  ylab("Life Expectancy")+
+  geom_line()+
+  geom_point()+
+  geom_errorbar(aes(ymin=Mean-SD,ymax=Mean+SD),width=.1) +
+  scale_color_manual(values = c("dodgerblue4", "#D55E00"));
+```
+
+```{r}
+# Final model on whole data set
+final.model<-lm(life_expectancy~schooling+status+schooling*status,data=Life)
+summary(final.model)
+
+plot(final.model$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(40,90),ylim=c(20,100))
+lines(c(40, 90),c(20,100),col="red")
+
+```
+
+
+```{r}
+# Studentized Residuals
+sres <- studres(model_fit)
+hist(sres, freq=FALSE,
+     main="Distribution of Studentized Residuals", xlab="Residuals")
+xfit<-seq(min(sres-1),max(sres)+1,length=60)
+yfit<-dnorm(xfit)
+lines(xfit, yfit, col="darkblue", lwd=2)
+
+```
+#### Hypothesis test
+
+The full model used here includes schooling, status, and the interactions between schooling and status.  The reduced model status and schooling.
+Ho:  Full model = Reduced Model
+Ha:  Full model != Reduced Model
+```{r}
+full.model <- lm(life_expectancy~schooling+status+schooling*status,data=Life)
+summary(full.model)
+reduced.model <- lm(life_expectancy~schooling+status,data=Life)
+summary(reduced.model)
+
+```
+
+**Conclusion:**  There is sufficient evidence that the full model is different than the reduced model (p-value < 0.0001) from a partial f-test.
+
+```{r}
+anova(reduced.model,full.model)
+```
+
+** Interpretation **
+For every 1-year increase in schooling, the increase in the mean estimated life expectancy is .98 years for people in developed countries (p-value < 0.0001).  The life expectancy in Developing countries is estimated to be 19.5 years less than mean life expectancy in Developed countries (for countries with zero education), but for every year increase in schooling, the mean life expectancy is estimated to be 1.06 that of  Developed countries (p-value < 0.0001).  
+
+** Confidence Intervals **
+-TBD
+
+#### Option 2 for interpretable model - use Random Forest for Model Selection
+
+```{r, fig.width=12, fig.height=6}
+# Random Forest Train/Test split
+library(MASS)
+library(randomForest)
+set.seed(1234)
+trainIndices = sample(1:nrow(Life), nrow(Life)/2)
+tree.test = Life[-trainIndices,"life_expectancy"]
+
+```
+
+```{r}
+
+# Prediction
+rf.le = randomForest(life_expectancy~.,data=Life,subset=trainIndices, mtry=6, importance=TRUE)
+yhat.rf = predict(rf.le, newdata = test)
+mean((yhat.rf-tree.test)^2)
+
+# Plot
+plot(yhat.rf,tree.test)
+abline(0,1)
+mean((yhat.bag-tree.test)^2)
+
+# Importance of variables
+importance(rf.le)
+varImpPlot(rf.le)
+
+```
+
+```{r}
+# Create a multiple regression model using the variables found above (hiv_aids + income_composition_of_resources + adult_mortality + schooling + status)
+set.seed(1234)
+trainIndicesLM = sample(seq(1:dim(Life)[1]),round(.7*dim(Life)[1]))
+trainLM = Life[trainIndicesLM,]
+testLM = Life[-trainIndicesLM,]
+dim(trainLM)
+dim(testLM)
+
+```
+
+```{r}
+# Fit the model
+model_fit <- lm(life_expectancy ~ hiv_aids + income_composition_of_resources + adult_mortality + schooling + status, data=trainLM)
+summary(model_fit)
+
+model_pre <- predict(model_fit, interval = "predict", newdata=testLM)
+model_pre
+
+```
+
+```{r}
+MSPE <- mean((model_pre[,1] - testLM$life_expectancy)^2)
+MSPE
+            
+```
+
+```{r}
+# Final model on whole data set
+final.model<-lm(life_expectancy~hiv_aids + income_composition_of_resources + adult_mortality + schooling + status,data=Life)
+summary(final.model)
+
+plot(final.model$fitted.values,Life$life_expectancy,xlab="Predicted",ylab="Life Expectancy",xlim=c(40,90),ylim=c(20,100))
+lines(c(40, 90),c(20,100),col="red")
+
+```
+
+**Compare Results to Fwd, Bwd, Stepwise, LASSO**
+
+
+#### Hypothesis test
+The full model used here includes all the variables selected from a stepwise regression.  The reduced model includes the top variables from a Random Forest along with the status variable.
+Ho:  Full model = Reduced Model
+Ha:  Full model != Reduced Model
+```{r}
+# Build full and reduced models
+reduced.model <- lm(life_expectancy~hiv_aids + income_composition_of_resources + adult_mortality + schooling + status,data=Life)
+summary(reduced.model)
+full.model <- lm(life_expectancy~.-total_expenditure -hepatitis_b -alcohol -infant_deaths, data=Life)
+summary(full.model)
+```
+
+**Conclusion:** The full model is significantly different than the reduced model (p-value < 0.001) from a partial f-test.
+```{r}
+# Build full and reduced models
+anova(reduced.model,full.model)
+```
+
+**Interpretation:**
+TBD
+
+**Confidence Intervals**
+TBD
