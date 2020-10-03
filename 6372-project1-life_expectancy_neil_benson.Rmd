@@ -57,15 +57,15 @@ life_ex_DF$status <- as.factor(life_ex_DF$status)
 ```
 
 
-## checking for missing data
-```{r}
+## Checking for missing data
+```{r, fig.height=7, fig.width=9}
 # checking for missing values in the data
 vis_miss(life_ex_DF) + xlab("Data Columns")
 ```
   
   
-## fix missing data
-```{r, fig.height=9, fig.width=9}
+## Fix missing data
+```{r, fig.height=7, fig.width=9}
 # sorting the columns so that life_expectancy column is first
 life_ex_DF <- life_ex_DF %>% select("life_expectancy", everything())
 
@@ -86,7 +86,7 @@ life_ex_median_DF <- as.data.frame(life_ex_DF %>%
 life_ex_median_DF <- life_ex_median_DF[!is.na(life_ex_median_DF$life_expectancy), ]
 
 
-# imputing the median by country still left a few nulls throughout. We will then impute the rest of the missing values as the mean of stats (developpoing, developed, by year)
+# imputing the median by country still left a few nulls throughout. We will then impute the rest of the missing values as the mean of status (developing, developed, by year)
 life_ex_cleaned_DF <- as.data.frame(life_ex_median_DF %>%
   group_by(status,year) %>%
   mutate_at(corvars, na.aggregate, FUN=median))
@@ -96,7 +96,7 @@ vis_miss(life_ex_cleaned_DF) + xlab("Data Columns")
 ```
 
 
-# summary of cleaned up data
+## Summary of cleaned up data
 ```{r}
 summary(life_ex_cleaned_DF)
 str(life_ex_cleaned_DF)
@@ -104,10 +104,26 @@ str(life_ex_cleaned_DF)
 t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,summary))
 t(aggregate(life_expectancy~status,data=life_ex_cleaned_DF,sd))
 ```
+  
+BMI has some very weird mins and maxes. Will explore further, but this data may later show correlations that aren't actually there because the min and max of BMI are not practical or possible.  
 
 
-# histogram of life_expectancy
-```{r}
+## BMI Boxplot by status (developing, developed)
+```{r, fig.height=7, fig.width=9}
+bmi_box <- geom_boxplot(
+  mapping = aes(y=bmi),
+  data = life_ex_cleaned_DF,
+  colour = "black",
+  fill = "#56B4E9",
+  groupColors=c('#999999','#E69F00')
+)
+
+ggplot()+ bmi_box + xlab("BMI") + ggtitle("BMI")
+
+```
+
+## Histogram of life_expectancy
+```{r, fig.height=7, fig.width=9}
 theme_set(theme_igray())
 
 le_hist <- geom_histogram(
@@ -119,12 +135,11 @@ le_hist <- geom_histogram(
 )
 
 ggplot()+ le_hist + xlab("Years") + ggtitle("Life Expectancy")
-
 ```
 
 
-# Overall Life Expectancy
-```{r}
+## Overall Life Expectancy
+```{r, fig.height=7, fig.width=9}
 
 le_by_yr <- ddply(life_ex_cleaned_DF, .(year), summarize,  avg_le=mean(life_expectancy))
 
@@ -139,9 +154,17 @@ ggplot() + le_line + xlab("Year") + ylab("Life Expectancy") + ggtitle("Average L
 
 ```
 
+##################
 
-# Developed/Developing Life Expectancy
-```{r visual1, fig.width=20, fig.height=10}
+
+Life Expectancy is linearly related to year, and year should be treated as continuous instead of as a factor in this model
+
+DROP BMI for having unrealistic range of data
+
+##################
+
+## Developed/Developing Life Expectancy
+```{r, fig.height=7, fig.width=9}
 le_by_status <- ddply(life_ex_cleaned_DF, .(year,status), summarize,  avg_le=mean(life_expectancy))
 line_colors <- c("dodgerblue4", "#D55E00")
 
@@ -156,8 +179,8 @@ ggplot() + le_line2 +  xlab("Year") + ylab("Life Expectancy") + ggtitle("Average
 ```
 
 
-# boxplot by status (developing, developed)
-```{r visual2, fig.width=6, fig.height=6}
+## Boxplot by status (developing, developed)
+```{r, fig.height=7, fig.width=9}
 # Plot boxplot
 
 dev_box <- geom_boxplot(
@@ -172,9 +195,11 @@ ggplot()+ dev_box + xlab("Status of Country") + ylab("Life Expectancy") + ggtitl
 
 ```
 
+There appears to be enough of a difference between `life_expectancy` mean by developed and developing `status`. We will perform an anova and analyze signifance in the difference in means. 
 
-# boxplots by status by year
-```{r visual3, fig.width=10, fig.height=6}
+
+## Boxplots by status by year
+```{r, fig.height=7, fig.width=9}
 # Plot boxplot
 
 yr_box <- stat_boxplot(
@@ -187,9 +212,74 @@ yr_box <- stat_boxplot(
 
 ggplot()+ yr_box + xlab("Year") + ylab("Life Expectancy") + scale_x_continuous(breaks=c(2000:2015)) + ggtitle("Life Expectancy by Year")  
 ```
-```{r fig.width=10, fig.height=6}
-# Scatterplot boxplot
 
+
+## Checking the significance of the factorial variables using ANOVA
+```{r}
+# convert categorical variables to factors
+names <- c("country", "year", "status")
+
+life_ex_cleaned_factor_DF <- life_ex_cleaned_DF
+
+# set the categorical columns to factor
+for (name in names)
+{
+  life_ex_cleaned_factor_DF[,name]<-factor(life_ex_cleaned_DF[,name])
+}
+
+# convert factors to numeric for factor analysis
+life_ex_cleaned_asnum_DF <- life_ex_cleaned_factor_DF[,names] %>% mutate_all(as.numeric)
+
+# adding suffix ASNUM to numerical representation of factors columns
+colnames(life_ex_cleaned_asnum_DF) <- paste(colnames(life_ex_cleaned_asnum_DF), "ASNUM", sep = "_")
+
+# adding numerical factor columns to base Df in order to perform stepwise for variable selection
+life_ex_cleaned_withnum_DF <- cbind(life_ex_cleaned_factor_DF, life_ex_cleaned_asnum_DF)
+
+# dropping factor columns
+life_ex_cleaned_withnum_DF <- life_ex_cleaned_withnum_DF[, sapply(life_ex_cleaned_withnum_DF, class) != "factor"]
+
+#  columns for anova factor analysis
+anovacols <- c(colnames(life_ex_cleaned_asnum_DF))
+
+#  creating the formula to pass into aov function
+anovafmla <- as.formula(paste("life_expectancy ~ ", paste(anovacols, collapse= "+")))
+
+# passing my auto generated formula to analyze
+anova_fit <- aov(anovafmla, data=life_ex_cleaned_withnum_DF)
+summary(anova_fit)
+```
+
+
+### Testing the life_expectancy mean difference by status  
+Equal means model significance here to test significance of mean difference of `life_expectancy` between status.  
+
+
+H0: μdeveloped = μdeveloping  
+Ha: μdeveloped ≠ μdeveloping  
+
+Reject H0 that the means are equal  
+
+This is statistically significant (p-value <2e-16), and we will include status as a factor to cconsider in the model.  
+
+### Testing the life_expectancy mean difference by year  
+Equal means model significance here to test significance of mean difference of `life_expectancy` between years.  
+
+
+H0: μ2000 = μ2001 = μ2002 = μ2003 = μ2004 = μ2005 = μ2006 = μ2007 = μ2008 = μ2009 = μ2010 = μ2011 = μ2012 = μ2013 = μ2014 = μ2015  
+Ha: μ2000 ≠ μ2001 ≠ μ2002 ≠ μ2003 ≠ μ2004 ≠ μ2005 ≠ μ2006 ≠ μ2007 ≠ μ2008 ≠ μ2009 ≠ μ2010 ≠ μ2011 ≠ μ2012 ≠ μ2013 ≠ μ2014 ≠ μ2015  
+
+Reject H0 that the means are equal  
+
+This is statistically significant (p-value <2e-16), and we will include year as a factor to cconsider in the model.  
+
+
+### Both year and status are statistically significant as categorical predictors. 
+Later will remove `country` from the data set for variable selection.  
+
+
+## Scatterplot boxplot
+```{r fig.width=10, fig.height=7}
 le_scatter <- geom_point(
   mapping = aes(x=year, y=life_expectancy, color=status),
   data = life_ex_cleaned_DF
@@ -200,7 +290,7 @@ ggplot()+ le_scatter + xlab("Year") + ylab("Life Expectancy") + scale_x_continuo
 ```
 
 
-# correlation matrix with pearson correlation coefficients
+## Correlation matrix with pearson correlation coefficients
 ```{r, fig.height=9, fig.width=9}
 library(reshape2)
 
@@ -248,23 +338,97 @@ ggcorrmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 ggcorrmap + geom_text(aes(Var2, Var1, label = value), color = "black", size = 2.5)
 ```
 It appears there is a high degree of correlation between the following:  
-- thinnes_5_9_years and thinnes_5_9_years
-- percentage_expenditure and gdp
-- under_5_deaths and infant_deaths
-- schooling and income_composition_of_resources
-- population has 0 correlation with the response variable and will be removed as a predictor and is incomplete throughout the data set
+- `thinnes_5_9_years` & `thinnes_10_19_years`  
+- `percentage_expenditure` & `gdp`  
+- `under_5_deaths` & `infant_deaths`  
+- `schooling` & `income_composition_of_resources`  
+- `population` has 0 correlation with the response variable and will be removed as a predictor and is incomplete throughout the data set  
 
 
-# further examining the issue of multicolinearity
+## Further examining the issue of multicolinearity
 ```{r, fig.height=9, fig.width=9}
 pairs(life_ex_cleaned_DF[,corvars], pch = 19,  cex = 0.5,
       col = line_colors[life_ex_cleaned_DF$status],
       upper.panel=NULL)
 
 ```
+It appears that both `hiv_aids` and `percentage_expenditure` have nonlinear relationships with the response variable. We will further investigate.  
+
+There also appears to be some interaction between `status` and `percentage_expenditure`, `status` and `schooling`, and `status` and `bmi`. Further exploration needed.
 
 
-# checking colinearity with VIF and removing redundant columns
+## Further exploration of hiv_ads and percentage_expenditure
+```{r, fig.height=7, fig.width=9}
+par(mfrow=c(1,2))
+
+plot(life_ex_cleaned_DF$hiv_aids,life_ex_cleaned_DF$life_expectancy, xlab="hiv_aids",ylab="life_expectancy")
+
+
+plot(life_ex_cleaned_DF$percentage_expenditure,life_ex_cleaned_DF$life_expectancy, xlab="percentage_expenditure",ylab="life_expectancy")
+```
+
+
+```{r, fig.height=7, fig.width=9}
+
+life_expectancy <- life_ex_cleaned_DF$life_expectancy
+hiv_aids <- life_ex_cleaned_DF$hiv_aids
+
+hiv_aids.model <- lm(life_expectancy~hiv_aids)
+
+# visually inspecting the reltationship between life_expectancy and hiv_aids before adding complexity
+par(mfrow=c(1,3))
+plot(hiv_aids,life_expectancy, xlab="hiv_aids",ylab="life_expectancy")
+new<-data.frame(hiv_aids=seq(0,50,.1))
+lines(seq(0,50,.1),predict(hiv_aids.model,newdata=new),col="red",lwd=4)
+plot(hiv_aids.model$fitted.values,hiv_aids.model$residuals,xlab="Fitted Values",ylab="Residuals")
+plot(life_ex_cleaned_DF$hiv_aids,hiv_aids.model$residuals,xlab="hiv_aids",ylab="Residuals")
+
+
+# adding complexity to relationship between life_expectancy and hiv_aids
+hiv_aids.model2 <- lm(life_expectancy~hiv_aids+I(log(hiv_aids)))
+
+
+# visually inspecting the reltationship between life_expectancy and hiv_aids after transformations
+par(mfrow=c(1,3))
+plot(hiv_aids,life_expectancy, xlab="hiv_aids",ylab="life_expectancy")
+new<-data.frame(hiv_aids=seq(0,50,.1))
+lines(seq(0,50,.1),predict(hiv_aids.model2,newdata=new),col="red",lwd=4)
+plot(hiv_aids.model2$fitted.values,hiv_aids.model2$residuals,xlab="Fitted Values",ylab="Residuals")
+plot(life_ex_cleaned_DF$hiv_aids,hiv_aids.model2$residuals,xlab="hiv_aids",ylab="Residuals")
+
+```
+
+
+```{r, fig.height=7, fig.width=9}
+
+percentage_expenditure <- life_ex_cleaned_DF$percentage_expenditure
+
+perc_exp.model <- lm(life_expectancy~percentage_expenditure)
+
+# visually inspecting the reltationship between life_expectancy and percentage_expenditure before adding complexity
+par(mfrow=c(1,3))
+plot(percentage_expenditure,life_expectancy, xlab="percentage_expenditure",ylab="life_expectancy")
+new2<-data.frame(percentage_expenditure=seq(0,20000,100))
+lines(seq(0,20000,100),predict(perc_exp.model,newdata=new2),col="red",lwd=4)
+plot(perc_exp.model$fitted.values,perc_exp.model$residuals,xlab="Fitted Values",ylab="Residuals")
+plot(life_ex_cleaned_DF$hiv_aids,perc_exp.model$residuals,xlab="hiv_aids",ylab="Residuals")
+
+
+# adding complexity to relationship between life_expectancy and percentage_expenditure
+perc_exp.model2 <- lm(life_expectancy~percentage_expenditure+I(sqrt(percentage_expenditure)))
+
+
+# visually inspecting the reltationship between life_expectancy and percentage_expenditure after transformations
+par(mfrow=c(1,3))
+plot(percentage_expenditure,life_expectancy, xlab="percentage_expenditure",ylab="life_expectancy")
+new2<-data.frame(percentage_expenditure=seq(0,20000,100))
+lines(seq(0,20000,100),predict(perc_exp.model2,newdata=new2),col="red",lwd=4)
+plot(perc_exp.model2$fitted.values,perc_exp.model2$residuals,xlab="Fitted Values",ylab="Residuals")
+plot(life_ex_cleaned_DF$percentage_expenditure,perc_exp.model2$residuals,xlab="percentage_expenditure",ylab="Residuals")
+```
+
+
+## Checking colinearity with VIF and removing redundant columns
 ```{r}
 library(car)
 
@@ -275,77 +439,55 @@ vif(full.model, data = life_ex_cleaned_DF)
 # removing columns and re-evaluating
 colstodelete <- c("under_five_deaths", "thinness_5_9_years", "gdp", "population")
 
-full.model1 <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars] %>% select(-colstodelete))
+full.model1 <- lm(life_expectancy~. ,data=life_ex_cleaned_DF[,corvars] %>% select(-all_of(colstodelete)))
 
 vif(full.model1, data = life_ex_cleaned_DF[,corvars] %>% select(-all_of(colstodelete)))
 
 ```
-infant_deaths and under_five_deaths have a VIF of 177.36 and 176.35 respectively, indicating a very high degree of 
-multicolinearity between the two. We will remove under_five_deaths and re-evaluate.
+- `infant_deaths` and `under_five_deaths` have a VIF of 177.36 and 176.35 respectively, indicating a very high degree of multicolinearity between the two. We will remove `under_five_deaths` and re-evaluate.  
+  
+- `thinness_5_9_years` and `thinness_10_19_years` have a VIF of 8.82 and 8.74 respectively, indicating a very high degree of multicolinearity between the two. We will remove `thinness_5_9_years` and re-evaluate.  
+  
+- `percentage_expenditure` and `gdp` have a VIF of 4.92 and 5.32 respectively, indicating a very high degree of multicolinearity between the two. We will remove `gdp` and re-evaluate.  
+  
+- `schooling` and `income_composition_of_resources` are correlated to each other with a high Pearson Correlation Coefficient of .8, but have VIFs of 3.62 and 3.05 respectively. While these are highly correlated, their VIFs are relatively low. We will leave them in them in for variable selection.  
+  
 
-thinness_5_9_years and thinness_10_19_years have a VIF of 8.82 and 8.74 respectively, indicating a very high degree of 
-multicolinearity between the two. We will remove thinness_5_9_years and re-evaluate.
-
-percentage_expenditure and gdp have a VIF of 4.92 and 5.32 respectively, indicating a very high degree of 
-multicolinearity between the two. We will remove gdp and re-evaluate.
-
-schooling and income_composition_of_resources have are correlated to each with Pearson Correlation Coefficient of .8, but have VIFs
-of 3.62 and 3.05. While these are highly correlated, their VIFs are relatively low. We will leave them in them in for variable selection.
-
-
-# checking the significance of the factorial variables using ANOVA
-```{r}
-# convert categorical variables to factors
-names <- c("country", "year", "status")
-
-life_ex_cleaned_factor_DF <- life_ex_cleaned_DF
-
-# set the categorical columns to factor
-for (name in names)
-{
-  life_ex_cleaned_factor_DF[,name]<-factor(life_ex_cleaned_DF[,name])
-}
-
-# convert factors to numeric for factor analysis
-life_ex_cleaned_asnum_DF <- life_ex_cleaned_factor_DF[,names] %>% mutate_all(as.numeric)
-
-# adding suffix ASNUM to numerical representation of factors columns
-colnames(life_ex_cleaned_asnum_DF) <- paste(colnames(life_ex_cleaned_asnum_DF), "ASNUM", sep = "_")
-
-# adding numerical factor columns to base Df in order to perform stepwise for variable selection
-life_ex_cleaned_withnum_DF <- cbind(life_ex_cleaned_factor_DF, life_ex_cleaned_asnum_DF)
-
-# dropping factor columns
-life_ex_cleaned_withnum_DF <- life_ex_cleaned_withnum_DF[, sapply(life_ex_cleaned_withnum_DF, class) != "factor"]
-
-#  columns for anova factor analysis
-anovacols <- c(colnames(life_ex_cleaned_asnum_DF))
-
-#  creating the formula to pass into aov function
-anovafmla <- as.formula(paste("life_expectancy ~ ", paste(anovacols, collapse= "+")))
-
-# passing my auto generated formula to analyze
-anova_fit <- aov(anovafmla, data=life_ex_cleaned_withnum_DF)
-summary(anova_fit)
-```
-Both year and status are statistically significant as categorical predictors. 
-We will remove country from the data set for variable selection.
-
-
-# removing columns with high colinearity or low significance
+## Removing columns with high colinearity or low significance
+"under_five_deaths", "thinness_5_9_years", "gdp", "population" and "country"  
 ```{r}
 # adding "country" to the list of columns to delete after its poor performance in ANOVA analysis
 colstodelete <- append(colstodelete, "country")  
-
 Life <- life_ex_cleaned_factor_DF %>% select(-colstodelete) 
+```
 
-# Checking residuals and q-q plot
+
+## Checking residuals and q-q plot of the full model
+Including complexity for the terms `hiv_aids` and `percentage_expenditure`.  
+```{r, fig.height=7, fig.width=9}
+full.model <- lm(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) ,data=Life)
 par(mfrow=c(2,2))
 plot(full.model)
 ```
 
 
-# splitting the data into test and training sets for cross validation
+## Adding interaction and checking significance
+Visual assessment of pair plots showed potential interactions between the following:  
+
+- `status` >> `percentage_expenditure`  
+- `status` >> `bmi`  
+- `status` >> `schooling`
+```{r, fig.height=7, fig.width=9}
+full.modelwinter <- lm(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure + status:bmi + status:schooling, data=Life)
+
+# Re-assessing the residual plots and assumptions
+par(mfrow=c(2,2))
+plot(full.modelwinter)
+summary(full.modelwinter)
+```
+
+
+## Splitting the data into test and training sets for cross validation
 ```{r}
 # Cross Validation on Train vs Test 
 # Splitting 2939 observations of the data into Training and Test set in the ratio of 70:30
@@ -358,7 +500,7 @@ dim(test)
 ```
 
 
-# creating a prediction function
+## Creating a prediction function
 ```{r}
 predict.regsubsets = function (object , newdata ,id ,...){
   form=as.formula (object$call [[2]])
@@ -370,128 +512,109 @@ predict.regsubsets = function (object , newdata ,id ,...){
 ```
 
 
-# Variable selection - Forward 
-```{r}
+## Variable selection - Forward 
+```{r, fig.height=7, fig.width=9}
 # Just the training set
 library(leaps)
 
-reg.fwd=regsubsets(life_expectancy~.,data=train,method="forward",nvmax=14)
+reg.fwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, data=train, method="forward", nvmax=24)
 
 par(mfrow=c(1,3))
 
+# BIC
 bics<-summary(reg.fwd)$bic
-
-plot(1:14,bics,type="l",ylab="BIC",xlab="# of predictors")
-
+plot(1:24,bics,type="l",ylab="BIC",xlab="# of predictors")
 index<-which(bics==min(bics))
-
 points(index,bics[index],col="red",pch=10)
 
+# Adjusted R2
 adjr2<-summary(reg.fwd)$adjr2
-
-plot(1:14,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
-
+plot(1:24,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index<-which(adjr2==max(adjr2))
-
 points(index,adjr2[index],col="red",pch=10)
 
+# RSS
 rss<-summary(reg.fwd)$rss
-
-plot(1:14,rss,type="l",ylab="train RSS",xlab="# of predictors")
-
+plot(1:24,rss,type="l",ylab="train RSS",xlab="# of predictors")
 index<-which(rss==min(rss))
-
 points(index,rss[index],col="red",pch=10)
-
 mtext("Variable selection - Forward", side = 3, line = -2, outer = TRUE)
 
-# -> 11 predictors
+# -> 15 predictors
 ```
 
 
-# Variable selection - Backward
-```{r}
+## Variable selection - Backward
+```{r, fig.height=7, fig.width=9}
 # Just the training set
-reg.bwd=regsubsets(life_expectancy~.,data=train,method="backward",nvmax=14)
+reg.bwd=regsubsets(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, data=train, method="backward", nvmax=24)
 
 par(mfrow=c(1,3))
 
+# BIC
 bics2<-summary(reg.bwd)$bic
-
-plot(1:14,bics2,type="l",ylab="BIC",xlab="# of predictors")
-
+plot(1:24,bics2,type="l",ylab="BIC",xlab="# of predictors")
 index2<-which(bics2==min(bics2))
-
 points(index2,bics2[index2],col="red",pch=10)
 
+# Adjusted R2
 adjr2<-summary(reg.bwd)$adjr2
-
-plot(1:14,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
-
+plot(1:24,adjr2,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index.r2<-which(adjr2==max(adjr2))
-
 points(index.r2,adjr2[index.r2],col="red",pch=10)
 
+# RSS
 rss2<-summary(reg.bwd)$rss
-
-plot(1:14,rss2,type="l",ylab="train RSS",xlab="# of predictors")
-
+plot(1:24,rss2,type="l",ylab="train RSS",xlab="# of predictors")
 index.rss2<-which(rss2==min(rss2))
-
 points(index.rss2,rss[index.rss2],col="red",pch=10)
-
 mtext("Variable selection - Backward", side = 3, line = -2, outer = TRUE)
 
-# -> 11 predictors
+# -> 13 predictors
 ```
 
 
-# Variable selection - Stepwise
-```{r}
+## Variable selection - Stepwise
+```{r, fig.height=7, fig.width=9}
 # Just the training set
-reg.stp=regsubsets(life_expectancy~.,data=train,method="seqrep",nvmax=14)
+reg.stp=regsubsets(life_expectancy~. + hiv_aids^2 + sqrt(percentage_expenditure) + status*percentage_expenditure + status*bmi + status*schooling, data=train, method="seqrep", nvmax=24)
 
 par(mfrow=c(1,3))
 
+# BIC
 bics3<-summary(reg.stp)$bic
-
-plot(1:14,bics,type="l",ylab="BIC",xlab="# of predictors")
-
+plot(1:24,bics,type="l",ylab="BIC",xlab="# of predictors")
 index3<-which(bics3==min(bics3))
-
 points(index3,bics[index3],col="red",pch=10)
 
+# Adjusted R2
 adjr3<-summary(reg.stp)$adjr
-
-plot(1:14,adjr3,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
-
+plot(1:24,adjr3,type="l",ylab="Adjusted R-squared",xlab="# of predictors")
 index3<-which(adjr3==max(adjr3))
-
 points(index3,adjr3[index3],col="red",pch=10)
 
+# RSS
 rss3<-summary(reg.stp)$rss
-
-plot(1:14,rss3,type="l",ylab="train RSS",xlab="# of predictors")
-
+plot(1:24,rss3,type="l",ylab="train RSS",xlab="# of predictors")
 index3<-which(rss3==min(rss3))
-
 points(index3,rss[index3],col="red",pch=10)
-
 mtext("Variable selection - Stepwise", side = 3, line = -2, outer = TRUE)
 
-# -> 11 predictors
+# -> 13 predictors
 ```
 
 
-# Variable selection - LASSO
-```{r}
+## Variable selection - LASSO
+```{r, fig.height=7, fig.width=9}
 library(glmnet)
 
-x=model.matrix(life_expectancy~.,train)[,-1]
-y=train$life_expectancy
 
-xtest<-model.matrix(life_expectancy~.,test)[,-1]
-ytest<-test$life_expectancy
+x=model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, train)[,-1]
+y=log(train$life_expectancy)
+
+xtest<-model.matrix(life_expectancy~. + I(hiv_aids^2) + I(sqrt(percentage_expenditure)) + status:percentage_expenditure+status:bmi + status:schooling, test)[,-1]
+ytest<-log(test$life_expectancy)
+
 
 grid=10^seq(10,-2, length =100)
 lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
@@ -526,13 +649,13 @@ reg.lso <- lm(life_expectancy~. -year -hepatitis_b, data=Life)
 ```
 
 
-# cross validating the models 
+## Cross validating the models on the test data
 ```{r}
 testASEfwd<-c()
 testASEbwd<-c()
 testASEstp<-c()
 
-for (i in 1:14){
+for (i in 1:24){
   # predicting the forward model on test set
   predictionsfwd<-predict.regsubsets(object=reg.fwd,newdata=test,id=i)
   testASEfwd[i]<-mean((test$life_expectancy-predictionsfwd)^2)
@@ -550,37 +673,37 @@ for (i in 1:14){
 ```
 
 
-# plots for something - ASE
+## Plots for something - ASE
 ```{r}
 par(mfrow=c(1,1))
-plot(1:14,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:24,testASEfwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEfwd==min(testASEfwd))
 points(index,testASEfwd[index],col="red",pch=10)
 rss<-summary(reg.fwd)$rss
-lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Forward", side = 3, line = -2, outer = TRUE)
 
 
 par(mfrow=c(1,1))
-plot(1:14,testASEbwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:24,testASEbwd,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEbwd==min(testASEbwd))
 points(index,testASEbwd[index],col="red",pch=10)
 rss<-summary(reg.bwd)$rss
-lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Backward", side = 3, line = -2, outer = TRUE)
 
 
 par(mfrow=c(1,1))
-plot(1:14,testASEstp,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
+plot(1:24,testASEstp,type="l",xlab="# of predictors",ylab="test vs train ASE",ylim=c(10,50))
 index<-which(testASEstp==min(testASEstp))
 points(index,testASEstp[index],col="red",pch=10)
 rss3<-summary(reg.stp)$rss3
-lines(1:14,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
+lines(1:24,rss/2928,lty=3,col="blue")  #Dividing by 2928 since ASE=RSS/sample size
 mtext("ASE - Stepwise", side = 3, line = -2, outer = TRUE)
 ```
 
 
-# Using forward backward, and stepwise to select max number of variables:11
+## Using forward backward, and stepwise to select max number of variables:11
 ```{r}
 # final variable selection for forward variable selection
 reg.finalfwd=regsubsets(life_expectancy~.,data=Life,method="forward",nvmax=11)
@@ -637,7 +760,7 @@ mtext("Lasso", side = 3, line = -2, outer = TRUE)
 ```
 
 
-# comparing the models
+## Comparing the models
 ```{r}
 
 # Function for Root Mean Squared Error
