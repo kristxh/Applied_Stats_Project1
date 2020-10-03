@@ -775,6 +775,8 @@ mtext("Stepwise", side = 3, line = -2, outer = TRUE)
 # final interpretable model
 final.interpretable <- lm(life_expectancy ~ status + adult_mortality + percentage_expenditure + measles + polio + total_expenditure + diphtheria + hiv_aids + thinness_10_19_years + income_composition_of_resources + schooling, data=Life)
 
+plot(final.interpretable)
+
 summary(final.interpretable)
 confint(final.interpretable)
 
@@ -825,7 +827,7 @@ BIC(final.modelbwd, final.modelstp, final.modellso, final.interpretable)
 ```
 
 ## Model Summary
-We see that isn't enough evidence to suggest that the fit between stepwise and backward is different. We do see that both of them are indicated to be better fitting than the lasso model. Additional evidence suggests that both the stepwise and bakward models returned lower diagostic fit metrics in RMSE, BIC, and AIC, and higher Adjusted R Squared compared to the lasso model.
+We see that isn't enough evidence to suggest that the fit between stepwise and backward is different. We do see that both of them are indicated to be better fitting than the lasso model. Additional evidence suggests that both the stepwise and backward models returned lower diagnostic fit metrics in RMSE, BIC, and AIC, and higher Adjusted R Squared compared to the lasso model.
 
 | Model         | ASE      | RMSE     | Adj R^2   | AIC      | BIC      | DF |
 |---------------|----------|----------|-----------|----------|----------|----|
