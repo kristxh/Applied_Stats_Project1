@@ -975,3 +975,32 @@ plot(LED_outcome_test~reg_results$pred, cex = .8, col = "dodgerblue", main = "k 
 reg_line = lm(LED_outcome_test~reg_results$pred)
 abline(reg_line, col = "red")
 ```
+#### Random Forest Model
+
+```{r, fig.width=12, fig.height=6}
+
+# Random Forest Train/Test split
+library(MASS)
+library(randomForest)
+set.seed(1234)
+trainIndices = sample(1:nrow(Life), nrow(Life)/2)
+tree.test = Life[-trainIndices,"life_expectancy"]
+
+# Prediction
+rf.le = randomForest(life_expectancy~.,data=Life,subset=trainIndices, mtry=6, importance=TRUE, proximity=TRUE)
+yhat.rf = predict(rf.le, newdata = Life[-trainIndices,])
+mean((yhat.rf-tree.test)^2)
+
+# Plot
+plot(yhat.rf,tree.test)
+abline(0,1)
+mean((yhat.rf-tree.test)^2)
+
+# Importance of variables
+importance(rf.le)
+varImpPlot(rf.le)
+
+# Accuracy 
+print(rf.le)
+
+```
