@@ -729,8 +729,7 @@ lines(c(20,110),c(20,110),col="red")
 mtext("Lasso", side = 3, line = -2, outer = TRUE)
 ```
 
-
-## ANOVA lack of fit test between final predictive model and interpretable model
+## ANOVA lack of fit test between backward model and lasso
 ```{r}
 anova(final.modelbwd, final.modellso)
 ```
@@ -793,7 +792,7 @@ plot(final.interpretable)
 
 
 
-## ANOVA lack of fit test between stepwise and backward model
+## ANOVA lack of fit test between final predictive model and interpretable model
 ```{r}
 anova(final.predictive, final.interpretable)
 ```
