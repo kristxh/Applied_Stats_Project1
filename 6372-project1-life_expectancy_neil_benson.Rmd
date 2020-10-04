@@ -981,25 +981,32 @@ abline(reg_line, col = "red")
 # Random Forest Train/Test split
 library(MASS)
 library(randomForest)
-set.seed(1234)
+set.seed(128)
 trainIndices = sample(1:nrow(Life), nrow(Life)/2)
 tree.test = Life[-trainIndices,"life_expectancy"]
 
+# Tuning to find mtry value
+tuneRF(Life, life_expectancy)
+
 # Prediction
-rf.le = randomForest(life_expectancy~.,data=Life,subset=trainIndices, mtry=6, importance=TRUE, proximity=TRUE)
+rf.le = randomForest(life_expectancy~.,data=Life,subset=trainIndices, mtry=5, importance=TRUE, proximity=TRUE)
 yhat.rf = predict(rf.le, newdata = Life[-trainIndices,])
+
+# ASE
 mean((yhat.rf-tree.test)^2)
 
 # Plot
-plot(yhat.rf,tree.test)
-abline(0,1)
+plot(yhat.rf,tree.test, main="Random Forest Results", xlab="Predicted Values", ylab="Actual Values", col="dodgerblue2")
+abline(0,1, col="red")
 mean((yhat.rf-tree.test)^2)
 
 # Importance of variables
 importance(rf.le)
 varImpPlot(rf.le)
 
-# Accuracy 
+# Print
 print(rf.le)
+summary(Life)
 
+```
 ```
